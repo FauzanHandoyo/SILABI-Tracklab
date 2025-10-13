@@ -1,206 +1,230 @@
 import React, { useState } from 'react';
+import DashboardNav from './DashboardNav';
 
 // Dummy data for demonstration
 const assets = [
   {
-    id: 'A001',
-    name: 'Oscilloscope',
-    status: 'Active',
-    location: 'Lab 1',
-    lastSeen: '2025-10-13 09:15',
-    history: [
-      { date: '2025-10-12', location: 'Lab 2' },
-      { date: '2025-10-11', location: 'Lab 1' },
-    ],
+    id: 'LAB-001',
+    name: 'Microscope - Olympus CX23',
+    category: 'Optical Equipment',
+    location: 'Biology Lab A',
+    status: 'In Use',
+    assigned: 'Mirza Adi R.',
+    lastUpdated: '2025-10-10',
   },
   {
-    id: 'A002',
-    name: 'Multimeter',
+    id: 'LAB-002',
+    name: 'Centrifuge - Eppendorf 5424',
+    category: 'Sample Processing',
+    location: 'Chemistry Lab B',
+    status: 'Available',
+    assigned: '',
+    lastUpdated: '2025-10-12',
+  },
+  {
+    id: 'LAB-003',
+    name: 'pH Meter - Mettler Toledo',
+    category: 'Measurement Tools',
+    location: 'Chemistry Lab A',
+    status: 'In Use',
+    assigned: 'Salim',
+    lastUpdated: '2025-10-09',
+  },
+  {
+    id: 'LAB-004',
+    name: 'Spectrophotometer UV-Vis',
+    category: 'Analytical Equipment',
+    location: 'Research Lab C',
     status: 'Missing',
-    location: 'Unknown',
-    lastSeen: '2025-10-10 14:20',
-    history: [
-      { date: '2025-10-09', location: 'Lab 1' },
-      { date: '2025-10-08', location: 'Lab 3' },
-    ],
+    assigned: '',
+    lastUpdated: '2025-10-05',
   },
   {
-    id: 'A003',
-    name: 'Power Supply',
-    status: 'Inactive',
-    location: 'Lab 2',
-    lastSeen: '2025-10-09 11:00',
-    history: [
-      { date: '2025-10-08', location: 'Lab 2' },
-      { date: '2025-10-07', location: 'Lab 2' },
-    ],
+    id: 'LAB-005',
+    name: 'Hot Plate Stirrer',
+    category: 'Heating Equipment',
+    location: 'Chemistry Lab B',
+    status: 'Available',
+    assigned: '',
+    lastUpdated: '2025-10-11',
+  },
+  {
+    id: 'LAB-006',
+    name: 'Analytical Balance',
+    category: 'Measurement Tools',
+    location: 'Research Lab A',
+    status: 'In Use',
+    assigned: 'Fauzan Farras H.',
+    lastUpdated: '2025-10-08',
+  },
+  {
+    id: 'LAB-007',
+    name: 'Pipette Set (10-1000μL)',
+    category: 'Lab Supplies',
+    location: 'Biology Lab B',
+    status: 'Available',
+    assigned: '',
+    lastUpdated: '2025-10-12',
+  },
+  {
+    id: 'LAB-008',
+    name: 'PCR Thermal Cycler',
+    category: 'Molecular Biology',
+    location: 'Genetics Lab',
+    status: 'In Use',
+    assigned: 'Mirza Adi R.',
+    lastUpdated: '2025-10-10',
+  },
+  {
+    id: 'LAB-009',
+    name: 'Autoclave - Large Capacity',
+    category: 'Sterilization',
+    location: 'Central Equipment Room',
+    status: 'Available',
+    assigned: '',
+    lastUpdated: '2025-10-12',
+  },
+  {
+    id: 'LAB-010',
+    name: 'Gel Electrophoresis System',
+    category: 'Molecular Biology',
+    location: 'Research Lab C',
+    status: 'Missing',
+    assigned: '',
+    lastUpdated: '2025-10-03',
   },
 ];
 
-const roles = ['Lab Manager', 'Technician'];
-
 const statusColors: Record<string, string> = {
-  Active: 'bg-green-100 text-green-700',
-  Missing: 'bg-red-100 text-red-700 animate-pulse',
-  Inactive: 'bg-yellow-100 text-yellow-700',
+  'In Use': 'bg-gray-900 text-white',
+  'Available': 'bg-green-100 text-green-700',
+  'Missing': 'bg-red-100 text-red-700',
 };
 
-const Dashboard: React.FC = () => {
-  const [search, setSearch] = useState('');
-  const [role, setRole] = useState(roles[0]);
-  const [selectedAsset, setSelectedAsset] = useState<number | null>(null);
+const statusBadge: Record<string, string> = {
+  'In Use': 'In Use',
+  'Available': 'Available',
+  'Missing': 'Missing',
+};
 
-  // Filter assets by search
-  const filteredAssets = assets.filter(
-    (asset) =>
-      asset.name.toLowerCase().includes(search.toLowerCase()) ||
-      asset.id.toLowerCase().includes(search.toLowerCase())
-  );
+const tabs = [
+  { label: `All Assets (${assets.length})`, filter: () => true },
+  { label: `In Use (${assets.filter(a => a.status === 'In Use').length})`, filter: (a: any) => a.status === 'In Use' },
+  { label: `Available (${assets.filter(a => a.status === 'Available').length})`, filter: (a: any) => a.status === 'Available' },
+  { label: `Missing (${assets.filter(a => a.status === 'Missing').length})`, filter: (a: any) => a.status === 'Missing' },
+];
+
+const Dashboard: React.FC = () => {
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Summary counts
+  const totalAssets = assets.length;
+  const inUse = assets.filter(a => a.status === 'In Use').length;
+  const available = assets.filter(a => a.status === 'Available').length;
+  const missing = assets.filter(a => a.status === 'Missing').length;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center py-8">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl p-8">
+        <DashboardNav />
+        <div className="p-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-blue-700">Lab Asset Dashboard</h1>
-            <p className="text-gray-500">Real-time monitoring & tracking of laboratory assets</p>
+        <div className="flex items-center gap-4 mb-6">
+          <div className="bg-blue-100 rounded-full p-3">
+            <svg width="32" height="32" fill="none" viewBox="0 0 24 24">
+              <rect width="24" height="24" rx="6" fill="#2563eb"/>
+              <path d="M8 10V8a4 4 0 118 0v2" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+              <rect x="6" y="10" width="12" height="8" rx="2" fill="#fff"/>
+              <circle cx="12" cy="14" r="2" fill="#2563eb"/>
+            </svg>
           </div>
           <div>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-gray-300 focus:ring-blue-400 focus:outline-none"
-            >
-              {roles.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+            <div className="font-bold text-xl text-gray-900">SILABI</div>
+            <div className="text-gray-500 text-sm">Central Dashboard</div>
           </div>
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-          <input
-            type="text"
-            placeholder="Search by asset name or ID..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400"
-          />
-          <div className="flex gap-2">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs">Active</span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs">Inactive</span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs">Missing</span>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="bg-gray-50 rounded-xl p-4 flex flex-col items-center">
+            <div className="text-gray-500 text-xs mb-1">Total Assets</div>
+            <div className="text-2xl font-bold text-gray-900">{totalAssets}</div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-4 flex flex-col items-center">
+            <div className="text-blue-600 text-xs mb-1">In Use</div>
+            <div className="text-2xl font-bold text-blue-600">{inUse}</div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-4 flex flex-col items-center">
+            <div className="text-green-600 text-xs mb-1">Available</div>
+            <div className="text-2xl font-bold text-green-600">{available}</div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-4 flex flex-col items-center">
+            <div className="text-red-600 text-xs mb-1">Missing</div>
+            <div className="text-2xl font-bold text-red-600">{missing}</div>
           </div>
         </div>
 
-        {/* Notifications */}
-        <div className="mb-4">
-          {assets.some((a) => a.status === 'Missing') && (
-            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-2 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
-              </svg>
-              <span>Alert: There are missing assets! Please check immediately.</span>
-            </div>
-          )}
-        </div>
+        {/* Asset Inventory */}
+        <div className="bg-gray-50 rounded-xl p-6">
+          <div className="mb-2 font-semibold text-gray-900 text-lg">Asset Inventory</div>
+          <div className="text-gray-500 text-sm mb-4">View and manage all laboratory assets</div>
 
-        {/* Asset Table */}
-        <div className="bg-white rounded-xl shadow-lg overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-blue-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Location</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Last Seen</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAssets.map((asset, idx) => (
-                <tr key={asset.id} className="hover:bg-blue-50 transition">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asset.id}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asset.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[asset.status]}`}>
-                      {asset.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asset.location}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{asset.lastSeen}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      className="text-blue-600 hover:underline text-sm"
-                      onClick={() => setSelectedAsset(idx)}
-                    >
-                      View History
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredAssets.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-400">No assets found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Asset History Modal */}
-        {selectedAsset !== null && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative">
+          {/* Tabs */}
+          <div className="flex gap-2 mb-4">
+            {tabs.map((tab, idx) => (
               <button
-                className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-                onClick={() => setSelectedAsset(null)}
+                key={tab.label}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                  activeTab === idx
+                    ? 'bg-white shadow text-blue-700'
+                    : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                }`}
+                onClick={() => setActiveTab(idx)}
               >
-                &times;
+                {tab.label}
               </button>
-              <h3 className="text-xl font-bold mb-4 text-blue-700">
-                Asset History: {assets[selectedAsset].name}
-              </h3>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="text-left py-2">Date</th>
-                    <th className="text-left py-2">Location</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {assets[selectedAsset].history.map((h, i) => (
-                    <tr key={i}>
-                      <td className="py-1">{h.date}</td>
-                      <td className="py-1">{h.location}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            ))}
           </div>
-        )}
 
-        {/* Simple Chart (Demo) */}
-        <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-lg font-semibold text-blue-700 mb-4">Asset Status Overview</h2>
-          <div className="flex gap-8 items-end h-32">
-            <div className="flex flex-col items-center">
-              <div className="w-10 bg-green-400 rounded-t-lg" style={{ height: `${assets.filter(a => a.status === 'Active').length * 30}px` }} />
-              <span className="mt-2 text-sm text-green-700">Active</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-10 bg-yellow-400 rounded-t-lg" style={{ height: `${assets.filter(a => a.status === 'Inactive').length * 30}px` }} />
-              <span className="mt-2 text-sm text-yellow-700">Inactive</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-10 bg-red-400 rounded-t-lg" style={{ height: `${assets.filter(a => a.status === 'Missing').length * 30}px` }} />
-              <span className="mt-2 text-sm text-red-700">Missing</span>
-            </div>
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="py-2 px-3 text-left font-semibold text-gray-600">Asset ID</th>
+                  <th className="py-2 px-3 text-left font-semibold text-gray-600">Name</th>
+                  <th className="py-2 px-3 text-left font-semibold text-gray-600">Category</th>
+                  <th className="py-2 px-3 text-left font-semibold text-gray-600">Location</th>
+                  <th className="py-2 px-3 text-left font-semibold text-gray-600">Status</th>
+                  <th className="py-2 px-3 text-left font-semibold text-gray-600">Assigned To</th>
+                  <th className="py-2 px-3 text-left font-semibold text-gray-600">Last Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assets.filter(tabs[activeTab].filter).map((asset) => (
+                  <tr key={asset.id} className="border-b hover:bg-gray-100">
+                    <td className="py-2 px-3 font-mono text-gray-900">{asset.id}</td>
+                    <td className="py-2 px-3 text-gray-900">{asset.name}</td>
+                    <td className="py-2 px-3 text-blue-700 underline cursor-pointer">{asset.category}</td>
+                    <td className="py-2 px-3 text-blue-700 underline cursor-pointer">{asset.location}</td>
+                    <td className="py-2 px-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[asset.status]}`}>
+                        {statusBadge[asset.status]}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-gray-900">{asset.assigned || <span className="text-gray-400">—</span>}</td>
+                    <td className="py-2 px-3 text-gray-500">{asset.lastUpdated}</td>
+                  </tr>
+                ))}
+                {assets.filter(tabs[activeTab].filter).length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-4 text-center text-gray-400">No assets found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
+                  </div>
         </div>
       </div>
     </div>
