@@ -5,6 +5,7 @@ dotenv.config();
 
 const pool = require('./db');
 const asetRoutes = require('./src/routes/asetInventarisRoutes');
+const userRoutes = require('./src/routes/userRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +17,7 @@ app.get('/', async (req, res) => {
 });
 
 app.use('/api/aset', asetRoutes);
+app.use('/api/users', userRoutes);
 
 pool.connect()
     .then(() => {
