@@ -1,6 +1,6 @@
-// ...existing code...
-const express = require('express');
 const dotenv = require('dotenv');
+const express = require('express');
+const cors = require('cors');
 dotenv.config();
 
 const pool = require('./db');
@@ -9,6 +9,12 @@ const userRoutes = require('./src/routes/userRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Enable CORS for frontend
+app.use(cors({
+  origin: 'http://localhost:5173', // your frontend URL (Vite default)
+  credentials: true
+}));
 
 app.use(express.json());
 
@@ -30,4 +36,3 @@ pool.connect()
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-// ...existing code...
