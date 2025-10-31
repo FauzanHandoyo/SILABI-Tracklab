@@ -1,8 +1,10 @@
-// DISCLAIMER
-// KODE NYA MOSTLY THEORITICAL/UNTESTED KARENA HARDWARENYA BLOM ADA
-
 #include "BLEDevice.h"
 #include <vector> // Buat list dinamis
+#include <WiFi.h>
+
+// Help me figure out biar bisa dinamis ges
+const char* ssid = "NAMA_WIFI_ANDA";
+const char* password = "PASSWORD_WIFI_ANDA";
 
 // === DAFTAR ASET ===
 std::vector<String> daftarAsetMaster;
@@ -12,6 +14,26 @@ std::vector<bool> asetDitemukan;
 // Variabel untuk proses scanning
 static BLEScan* pBLEScan;
 int scanTime = 5; // Durasi scan dalam detik
+
+// WiFI Connection
+void setupWiFi() {
+  Serial.println();
+  Serial.print("[WiFi] Menghubungkan ke: ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+
+  // Tunggu sampai WiFi terhubung
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\n[WiFi] Berhasil terhubung!");
+  Serial.print("[WiFi] Alamat IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println("----------------------------------------");
+}
 
 // Fungsi ini akan dipanggil setiap kali ada perangkat BLE ditemukan
 class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
@@ -46,6 +68,9 @@ void sinkronkanDaftarAsetDariDB() {
   // 1. Bersihkan daftar lama
   daftarAsetMaster.clear();
   // 2. Tambahkan data dari database
+  // TESTING
+  daftarAsetMaster.push_back("SILABI_osilos");
+  daftarAsetMaster.push_back("SILABI_reactor");
   // Insert database logic here
 
   // 3. Sesuaikan array 'asetDitemukan'
@@ -59,6 +84,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Memulai SILABI Gateway Scanner...");
 
+  // Coonect to WiFi
+  setupWiFi();
   // PANGGIL FUNGSI SINKRONISASI DATABASE SAAT BOOTING
   sinkronkanDaftarAsetDariDB();
 
@@ -79,9 +106,9 @@ void loop() {
   }
 
   // Mulai scan BLE selama 'scanTime' detik
-  BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
+  BLEScanResults* foundDevices = pBLEScan->start(scanTime, false);
   
-  Serial.printf("Scan Selesai! Ditemukan %d perangkat BLE.\n", foundDevices.getCount());
+  Serial.printf("Scan Selesai! Ditemukan %d perangkat BLE.\n", foundDevices->getCount());
   Serial.println("--- Laporan Status Aset ---");
 
   // Cek array asetDitemukan (sekarang menggunakan .size())
