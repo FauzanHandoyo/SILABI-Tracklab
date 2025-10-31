@@ -1,9 +1,16 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 const Navigation: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
+
+  const handleLogout = () => {
+    // Add any logout logic here (e.g., clearing localStorage, cookies, etc.)
+    localStorage.removeItem('token'); // If you're using token-based auth
+    navigate('/login'); // Redirect to login page
+  };
 
   const getLinkClass = (path: string) => {
     const isActive = currentPath === path;
@@ -32,7 +39,10 @@ const Navigation: React.FC = () => {
         <Link to="/assets" className={getLinkClass('/assets')}>Assets</Link>
         <Link to="/history" className={getLinkClass('/history')}>History</Link>
         <Link to="/notifications" className={getLinkClass('/notifications')}>Notifications</Link>
-        <button className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+        <button 
+          onClick={handleLogout}
+          className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+        >
           Logout
         </button>
       </div>
