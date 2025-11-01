@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { assetAPI } from '../utils/api'
 
 type Asset = {
     id: string
@@ -19,14 +20,28 @@ export default function Assets() {
     useEffect(() => {
         const fetchAssets = async () => {
             try {
-                const response = await fetch('/api/assets')
-                if (!response.ok) throw new Error('Failed to fetch assets')
-                const data = await response.json()
-                setAssets(data)
+                const response = await assetAPI.getAll()
+                // Transform backend data to match frontend type
+                const transformedData = response.data.map((asset: any) => ({
+                    id: `LAB-${String(asset.id).padStart(3, '0')}`,
+                    name: asset.nama_aset,
+                    assetType: asset.category || 'Unknown',
+                    location: asset.location || 'Unknown',
+                    lastSeen: asset.last_updated || new Date().toISOString(),
+                    rssi: asset.latitude && asset.longitude ? -60 : 0,
+                    status: asset.status_hilang 
+                        ? 'Missing' 
+                        : asset.status_aset === 'Tersedia' 
+                        ? 'Present' 
+                        : asset.status_aset === 'Dipinjam'
+                        ? 'Inactive'
+                        : 'Inactive'
+                }))
+                setAssets(transformedData)
+                setError(null)
             } catch (err) {
                 setError('Failed to load assets')
-                // Fallback to mock data during development
-                setAssets(getMockAssets())
+                console.error('Error loading assets:', err)
             } finally {
                 setLoading(false)
             }
@@ -95,16 +110,4 @@ export default function Assets() {
             )}
         </div>
     )
-}
-
-function getMockAssets(): Asset[] {
-    return Array.from({ length: 12 }, (_, i) => ({
-        id: `TAG-${1000 + i}`,
-        name: `Asset ${i + 1}`,
-        assetType: ['Equipment', 'Tool', 'Vehicle'][i % 3],
-        location: ['Workshop', 'Storage', 'Field'][i % 3],
-        lastSeen: new Date(Date.now() - i * 1000 * 60 * 15).toISOString(),
-        rssi: -50 - Math.floor(Math.random() * 30),
-        status: ['Present', 'Missing', 'Inactive'][i % 3] as Asset['status']
-    }))
 }

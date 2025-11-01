@@ -1,7 +1,6 @@
 function validateRegistration(req, res, next) {
   const { full_name, email, username, password, confirmPassword, role } = req.body;
   
-  // Check required fields
   if (!full_name || full_name.trim() === '') {
     return res.status(400).json({ error: 'Full name is required' });
   }
@@ -26,7 +25,6 @@ function validateRegistration(req, res, next) {
     return res.status(400).json({ error: 'Passwords do not match' });
   }
   
-  // Validate role (must be 'user', 'admin', or 'technician')
   const validRoles = ['user', 'admin', 'technician'];
   if (role && !validRoles.includes(role.toLowerCase())) {
     return res.status(400).json({ error: 'Invalid role' });
@@ -56,7 +54,7 @@ function validateUser(req, res, next) {
     return res.status(400).json({ error: 'Valid email is required' });
   }
   
-  if (!password || password.length < 6) {
+  if (password && password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
   
@@ -74,7 +72,17 @@ function validateAsset(req, res, next) {
     return res.status(400).json({ error: 'Asset status is required' });
   }
   
+  const validStatuses = ['Tersedia', 'Dipinjam', 'Dalam Perbaikan'];
+  if (!validStatuses.includes(status_aset)) {
+    return res.status(400).json({ error: 'Invalid status. Must be: Tersedia, Dipinjam, or Dalam Perbaikan' });
+  }
+  
   next();
 }
 
-module.exports = { validateRegistration, validateLogin, validateUser, validateAsset };
+module.exports = { 
+  validateRegistration, 
+  validateLogin, 
+  validateUser, 
+  validateAsset 
+};
