@@ -28,7 +28,7 @@ export default function LoginForm() {
       await authAPI.login(formData);
       
       // Redirect to dashboard using navigate
-      navigate('/dashboard');
+      navigate('/');
       
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
