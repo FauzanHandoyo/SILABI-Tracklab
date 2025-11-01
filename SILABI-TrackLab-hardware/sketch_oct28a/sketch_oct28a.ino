@@ -1,10 +1,14 @@
 #include "BLEDevice.h"
+#include "BLEScan.h"
 #include <vector> // Buat list dinamis
 #include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 // Help me figure out biar bisa dinamis ges
 const char* ssid = "NAMA_WIFI_ANDA";
 const char* password = "PASSWORD_WIFI_ANDA";
+const char* apiHost = "http://api.proyek-silabi.com"; // PLACEHOLDER
 
 // === DAFTAR ASET ===
 std::vector<String> daftarAsetMaster;
@@ -13,7 +17,7 @@ std::vector<bool> asetDitemukan;
 
 // Variabel untuk proses scanning
 static BLEScan* pBLEScan;
-int scanTime = 5; // Durasi scan dalam detik
+int scanTime = 12; // Durasi scan dalam detik
 
 // WiFI Connection
 void setupWiFi() {
@@ -35,7 +39,7 @@ void setupWiFi() {
   Serial.println("----------------------------------------");
 }
 
-// Fungsi ini akan dipanggil setiap kali ada perangkat BLE ditemukan
+// Fungsi ini akan dipanggil setiap kali ada BLE ditemukan
 class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) {
       String deviceName = advertisedDevice.getName().c_str();
@@ -54,29 +58,46 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     }
 };
 
-// === FUNGSI PLACEHOLDER DATABASE BARU ===
-/*
- * Placeholder untuk sinkronisasi daftar aset dari Database
- * Kurang kode:
- * - Menghubungi Firebase/MySQL
- * - Mengambil daftar aset
- * - Memasukkannya ke dalam std::vector 'daftarAsetMaster'
- */
 void sinkronkanDaftarAsetDariDB() {
-  Serial.println("[DB] Memulai sinkronisasi daftar aset dari database...");
-  // My thought process so far
-  // 1. Bersihkan daftar lama
+  Serial.println("[API] Memulai sinkronisasi daftar aset dari server...");
   daftarAsetMaster.clear();
-  // 2. Tambahkan data dari database
-  // TESTING
-  daftarAsetMaster.push_back("SILABI_osilos");
-  daftarAsetMaster.push_back("SILABI_reactor");
-  // Insert database logic here
 
-  // 3. Sesuaikan array 'asetDitemukan'
+  HTTPClient http;
+  String url = String(apiHost) + "/daftar_aset"; // Endpoint GET
+
+  Serial.print("[API] Melakukan GET request ke: ");
+  Serial.println(url);
+
+  if (http.begin(url)) { // Mulai koneksi
+    int httpCode = http.GET(); // Kirim request
+
+    if (httpCode == HTTP_CODE_OK) { // Koneksi sukses
+      String payload = http.getString();
+      Serial.println("[API] Respon diterima:");
+      Serial.println(payload);
+      
+      // --- PLACEHOLDER UNTUK PARSING JSON ---
+      // Gw gak tau array-nya kek mana. So, asumsikan array: ["aset1", "aset2"]
+      DynamicJsonDocument doc(1024);
+      deserializeJson(doc, payload);
+      JsonArray array = doc.as<JsonArray>();
+      
+      for(JsonVariant v : array) {
+        String namaAset = v.as<String>();
+        daftarAsetMaster.push_back(namaAset);
+      }
+      // ----------------------------------------
+
+    } else {
+      Serial.printf("[API] Gagal! HTTP code: %d\n", httpCode);
+    }
+    http.end(); // Tutup koneksi
+  } else {
+    Serial.println("[API] Gagal memulai koneksi HTTP.");
+  }
+
   asetDitemukan.resize(daftarAsetMaster.size());
-  
-  Serial.printf("[DB] Sinkronisasi Selesai. Jumlah aset terdaftar: %d\n", daftarAsetMaster.size());
+  Serial.printf("[API] Sinkronisasi Selesai. Jumlah aset terdaftar: %d\n", daftarAsetMaster.size());
   Serial.println("----------------------------------------");
 }
 
@@ -100,7 +121,7 @@ void setup() {
 void loop() {
   Serial.println("\n--- Memulai Siklus Scan Baru ---");
 
-  // Reset status penemuan (sekarang menggunakan .size())
+  // Reset status penemuan
   for (int i = 0; i < daftarAsetMaster.size(); i++) {
     asetDitemukan[i] = false;
   }
@@ -111,7 +132,7 @@ void loop() {
   Serial.printf("Scan Selesai! Ditemukan %d perangkat BLE.\n", foundDevices->getCount());
   Serial.println("--- Laporan Status Aset ---");
 
-  // Cek array asetDitemukan (sekarang menggunakan .size())
+  // Cek array asetDitemukan
   for (int i = 0; i < daftarAsetMaster.size(); i++) {
     String namaAset = daftarAsetMaster[i];
     String status;
@@ -124,21 +145,48 @@ void loop() {
       Serial.printf("[!!] %s \t | Status: %s\n", namaAset.c_str(), status.c_str());
     }
 
-    // Panggil fungsi placeholder untuk kirim data ke cloud
     kirimKeCloud(namaAset, status);
   }
 
   pBLEScan->clearResults(); // Bersihkan hasil scan sebelumnya
   delay(10000); // Tunggu 10 detik sebelum memulai siklus scan baru
   
-  // Opsional: Anda bisa memanggil sinkronkanDaftarAsetDariDB()
-  // di sini secara periodik (misal, setiap jam) jika perlu.
+  // Ini bisa keep begini aja atau panggil sinkronkanDaftarAsetDariDB()
+  // di sini periodik (Ex. setiap jam) kalau mau
 }
 
 
-// === FUNGSI PLACEHOLDER PENGIRIMAN DATA ===
+// === FUNGSI PENGIRIMAN DATA ===
 void kirimKeCloud(String namaAset, String status) {
-  // Hanya cetak ke Serial untuk menunjukkan fungsi ini dipanggil
-  // (Dibiarkan non-aktif agar tidak terlalu ramai di serial monitor)
-  // Serial.printf("   -> [CLOUD] Mengirim data '%s' untuk '%s'...\n", status.c_str(), namaAset.c_str());
+  
+  // Hanya kirim kalau status berubah? (Optimasi, klo mau gw coba-coba)
+  // For now, kita kirim semua
+  
+  HTTPClient http;
+  String url = String(apiHost) + "/update_status"; // Endpoint POST
+
+  // --- PLACEHOLDER JSON PAYLOAD ---
+  // Ide nya kirim JSON: {"nama": "SILABI_osilos", "status": "DI TEMPAT"}
+  DynamicJsonDocument doc(256);
+  doc["nama"] = namaAset;
+  doc["status"] = status;
+  String jsonPayload;
+  serializeJson(doc, jsonPayload);
+  // ---------------------------------------------
+
+  Serial.printf("[API] Melakukan POST ke %s ... Payload: %s\n", url.c_str(), jsonPayload.c_str());
+
+  if (http.begin(url)) {
+    http.addHeader("Content-Type", "application/json");
+    int httpCode = http.POST(jsonPayload);
+
+    if (httpCode > 0) {
+      Serial.printf("[API] Status update terkirim, HTTP code: %d\n", httpCode);
+    } else {
+      Serial.printf("[API] Gagal mengirim status! Error: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+  } else {
+    Serial.println("[API] Gagal memulai koneksi POST.");
+  }
 }
