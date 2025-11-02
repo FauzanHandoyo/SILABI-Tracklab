@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { assetAPI } from '../utils/api'
+import AddAssetForm from './AddAssetForm'
 
 type Asset = {
     id: string
@@ -16,6 +17,7 @@ export default function Assets() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState('')
+    const [showForm, setShowForm] = useState(false)
 
     useEffect(() => {
         const fetchAssets = async () => {
@@ -55,14 +57,34 @@ export default function Assets() {
         asset.id.toLowerCase().includes(search.toLowerCase())
     )
 
+    const handleAddClick = () => setShowForm(true)
+    const handleCancel = () => setShowForm(false)
+
+    const handleCreated = (created: any) => {
+        // transform backend row to frontend Asset type
+        const newAsset: Asset = {
+            id: `LAB-${String(created.id).padStart(3, '0')}`,
+            name: created.nama_aset,
+            assetType: created.category || 'Unknown',
+            location: created.location || 'Unknown',
+            lastSeen: created.last_updated || new Date().toISOString(),
+            rssi: created.latitude && created.longitude ? -60 : 0,
+            status: created.status_hilang ? 'Missing' : created.status_aset === 'Tersedia' ? 'Present' : 'Inactive'
+        }
+        setAssets(prev => [newAsset, ...prev])
+        setShowForm(false)
+    }
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Assets</h1>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                <button onClick={handleAddClick} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                     Add Asset
                 </button>
             </div>
+
++           {showForm && <AddAssetForm onCreated={handleCreated} onCancel={handleCancel} />}
 
             <div className="mb-4">
                 <input
