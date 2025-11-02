@@ -2,18 +2,25 @@
 #include "BLEScan.h"
 #include <vector> // Buat list dinamis
 #include <WiFi.h>
-#include <HTTPClient.h>
+#include <NeonPostgresOverHTTP.h>
 #include <ArduinoJson.h>
+#include <WiFiClientSecure.h>
 
 // Help me figure out biar bisa dinamis ges
 const char* ssid = "NAMA_WIFI_ANDA";
 const char* password = "PASSWORD_WIFI_ANDA";
-const char* apiHost = "http://api.proyek-silabi.com"; // PLACEHOLDER
+const char* neonUser = "neondb_owner";
+const char* neonPassword = "npg_x0vSCIQ9meRs";
+const char* neonHost = "ep-plain-butterfly-a190b73m-pooler.ap-southeast-1.aws.neon.tech";
+const char* neonDb = "neondb";
 
 // === DAFTAR ASET ===
 std::vector<String> daftarAsetMaster;
 std::vector<bool> asetDitemukan;
-// =============================
+std::vector<String> statusAsetSebelumnya;
+
+WiFiClientSecure client;
+NeonPostgresOverHTTP neon(client);
 
 // Variabel untuk proses scanning
 static BLEScan* pBLEScan;
@@ -59,45 +66,32 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 };
 
 void sinkronkanDaftarAsetDariDB() {
-  Serial.println("[API] Memulai sinkronisasi daftar aset dari server...");
+  Serial.println("[Neon] Memulai sinkronisasi daftar aset...");
   daftarAsetMaster.clear();
 
-  HTTPClient http;
-  String url = String(apiHost) + "/daftar_aset"; // Endpoint GET
+  const char* query = "SELECT nama_aset FROM daftar_aset";
 
-  Serial.print("[API] Melakukan GET request ke: ");
-  Serial.println(url);
+  JsonDocument doc;
+  
+  bool success = neon.exec(doc, query);
+  
+  if (success) {
+    Serial.println("[Neon] Respon diterima:");
+    serializeJsonPretty(doc, Serial);
+    Serial.println();
 
-  if (http.begin(url)) { // Mulai koneksi
-    int httpCode = http.GET(); // Kirim request
-
-    if (httpCode == HTTP_CODE_OK) { // Koneksi sukses
-      String payload = http.getString();
-      Serial.println("[API] Respon diterima:");
-      Serial.println(payload);
-      
-      // --- PLACEHOLDER UNTUK PARSING JSON ---
-      // Gw gak tau array-nya kek mana. So, asumsikan array: ["aset1", "aset2"]
-      DynamicJsonDocument doc(1024);
-      deserializeJson(doc, payload);
-      JsonArray array = doc.as<JsonArray>();
-      
-      for(JsonVariant v : array) {
-        String namaAset = v.as<String>();
-        daftarAsetMaster.push_back(namaAset);
-      }
-      // ----------------------------------------
-
-    } else {
-      Serial.printf("[API] Gagal! HTTP code: %d\n", httpCode);
+    for (JsonObject row : doc.as<JsonArray>()) {
+      String namaAset = row["nama_aset"].as<String>();
+      daftarAsetMaster.push_back(namaAset);
     }
-    http.end(); // Tutup koneksi
   } else {
-    Serial.println("[API] Gagal memulai koneksi HTTP.");
+    Serial.println("[Neon] Gagal mengeksekusi query SELECT!");
+    Serial.println(neon.getErrorMessage());
   }
-
+  
   asetDitemukan.resize(daftarAsetMaster.size());
-  Serial.printf("[API] Sinkronisasi Selesai. Jumlah aset terdaftar: %d\n", daftarAsetMaster.size());
+  statusAsetSebelumnya.resize(daftarAsetMaster.size(), "");
+  Serial.printf("[Neon] Sinkronisasi Selesai. Jumlah aset terdaftar: %d\n", daftarAsetMaster.size());
   Serial.println("----------------------------------------");
 }
 
@@ -105,9 +99,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Memulai SILABI Gateway Scanner...");
 
-  // Coonect to WiFi
   setupWiFi();
-  // PANGGIL FUNGSI SINKRONISASI DATABASE SAAT BOOTING
+  neon.setConnection(neonHost, 443, neonUser, neonPassword, neonDb);
   sinkronkanDaftarAsetDariDB();
 
   BLEDevice::init(""); // Inisialisasi BLE
@@ -144,8 +137,10 @@ void loop() {
       status = "HILANG/PINDAH";
       Serial.printf("[!!] %s \t | Status: %s\n", namaAset.c_str(), status.c_str());
     }
-
+    if (status != statusAsetSebelumnya[i]) {
     kirimKeCloud(namaAset, status);
+    statusAsetSebelumnya[i] = status; // Simpan status baru ke memori
+    }
   }
 
   pBLEScan->clearResults(); // Bersihkan hasil scan sebelumnya
@@ -159,34 +154,23 @@ void loop() {
 // === FUNGSI PENGIRIMAN DATA ===
 void kirimKeCloud(String namaAset, String status) {
   
-  // Hanya kirim kalau status berubah? (Optimasi, klo mau gw coba-coba)
-  // For now, kita kirim semua
+  const char* query = 
+    "INSERT INTO status_aset (nama, status, timestamp) "
+    "VALUES (?, ?, NOW()) "
+    "ON CONFLICT (nama) DO UPDATE SET status = EXCLUDED.status, timestamp = NOW()";
+
+  // Siapkan parameter (Anti SQL Injection)
+  JsonDocument params;
+  params.add(namaAset);
+  params.add(status);
+
+  Serial.printf("[Neon] Mengirim status untuk: %s\n", namaAset.c_str());
   
-  HTTPClient http;
-  String url = String(apiHost) + "/update_status"; // Endpoint POST
-
-  // --- PLACEHOLDER JSON PAYLOAD ---
-  // Ide nya kirim JSON: {"nama": "SILABI_osilos", "status": "DI TEMPAT"}
-  DynamicJsonDocument doc(256);
-  doc["nama"] = namaAset;
-  doc["status"] = status;
-  String jsonPayload;
-  serializeJson(doc, jsonPayload);
-  // ---------------------------------------------
-
-  Serial.printf("[API] Melakukan POST ke %s ... Payload: %s\n", url.c_str(), jsonPayload.c_str());
-
-  if (http.begin(url)) {
-    http.addHeader("Content-Type", "application/json");
-    int httpCode = http.POST(jsonPayload);
-
-    if (httpCode > 0) {
-      Serial.printf("[API] Status update terkirim, HTTP code: %d\n", httpCode);
-    } else {
-      Serial.printf("[API] Gagal mengirim status! Error: %s\n", http.errorToString(httpCode).c_str());
-    }
-    http.end();
+  // Eksekusi query dengan parameter
+  if (neon.execParams(query, params.as<JsonArray>())) {
+    // Serial.println("[Neon] Status update terkirim.");
   } else {
-    Serial.println("[API] Gagal memulai koneksi POST.");
+    Serial.println("[Neon] GAGAL mengirim status!");
+    Serial.println(neon.getErrorMessage());
   }
 }
