@@ -1,62 +1,219 @@
 const pool = require('../../db');
 
+async function getAll() {
+  const query = `
+    SELECT 
+      id,
+      nama_aset,
+      category,
+      location,
+      status_aset,
+      assigned_to,
+      peminjam,
+      status_hilang,
+      latitude,
+      longitude,
+      last_updated
+    FROM aset_inventaris 
+    ORDER BY id ASC
+  `;
+  const result = await pool.query(query);
+  return result.rows;
+}
+
+async function getById(id) {
+  const query = `
+    SELECT 
+      id,
+      nama_aset,
+      category,
+      location,
+      status_aset,
+      assigned_to,
+      peminjam,
+      status_hilang,
+      latitude,
+      longitude,
+      last_updated
+    FROM aset_inventaris 
+    WHERE id = $1
+  `;
+  const result = await pool.query(query, [id]);
+  return result.rows[0];
+}
+
 async function create(data) {
-  const { nama_aset, status_aset, peminjam, latitude, longitude, status_hilang } = data;
-  const q = `INSERT INTO aset_inventaris (nama_aset, status_aset, peminjam, latitude, longitude, status_hilang)
-             VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
-  const lat = latitude == null ? null : parseFloat(latitude);
-  const lon = longitude == null ? null : parseFloat(longitude);
-  const { rows } = await pool.query(q, [
-    nama_aset,
-    status_aset,
-    peminjam || null,
-    Number.isNaN(lat) ? null : lat,
-    Number.isNaN(lon) ? null : lon,
-    !!status_hilang,
-  ]);
-  return rows[0];
-}
-
-async function findAll() {
-  const { rows } = await pool.query('SELECT * FROM aset_inventaris ORDER BY id');
-  return rows;
-}
-
-async function findById(id) {
-  const { rows } = await pool.query('SELECT * FROM aset_inventaris WHERE id = $1', [id]);
-  return rows[0];
+  const { 
+    nama_aset, 
+    category,
+    location,
+    status_aset, 
+    assigned_to,
+    peminjam, 
+    status_hilang, 
+    latitude, 
+    longitude 
+  } = data;
+  
+  const query = `
+    INSERT INTO aset_inventaris (
+      nama_aset, 
+      category,
+      location,
+      status_aset, 
+      assigned_to,
+      peminjam, 
+      status_hilang, 
+      latitude, 
+      longitude,
+      last_updated
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+    RETURNING *
+  `;
+  
+  const values = [
+    nama_aset, 
+    category || null,
+    location || null,
+    status_aset, 
+    assigned_to || null,
+    peminjam || null, 
+    status_hilang || false, 
+    latitude || null, 
+    longitude || null
+  ];
+  
+  const result = await pool.query(query, values);
+  return result.rows[0];
 }
 
 async function updateById(id, data) {
-  const fields = [];
-  const vals = [];
-  let idx = 1;
-
-  for (const key of ['nama_aset','status_aset','peminjam','latitude','longitude','status_hilang']) {
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
-      if (key === 'latitude' || key === 'longitude') {
-        const v = data[key] == null ? null : parseFloat(data[key]);
-        vals.push(Number.isNaN(v) ? null : v);
-      } else if (key === 'status_hilang') {
-        vals.push(!!data[key]);
-      } else {
-        vals.push(data[key]);
-      }
-      fields.push(`${key} = $${idx}`);
-      idx++;
-    }
-  }
-  if (fields.length === 0) return findById(id);
-
-  const q = `UPDATE aset_inventaris SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
-  vals.push(id);
-  const { rows } = await pool.query(q, vals);
-  return rows[0];
+  const { 
+    nama_aset, 
+    category,
+    location,
+    status_aset, 
+    assigned_to,
+    peminjam, 
+    status_hilang, 
+    latitude, 
+    longitude 
+  } = data;
+  
+  const query = `
+    UPDATE aset_inventaris 
+    SET 
+      nama_aset = COALESCE($1, nama_aset),
+      category = COALESCE($2, category),
+      location = COALESCE($3, location),
+      status_aset = COALESCE($4, status_aset),
+      assigned_to = COALESCE($5, assigned_to),
+      peminjam = COALESCE($6, peminjam),
+      status_hilang = COALESCE($7, status_hilang),
+      latitude = COALESCE($8, latitude),
+      longitude = COALESCE($9, longitude),
+      last_updated = CURRENT_TIMESTAMP
+    WHERE id = $10
+    RETURNING *
+  `;
+  
+  const values = [
+    nama_aset, 
+    category,
+    location,
+    status_aset, 
+    assigned_to,
+    peminjam, 
+    status_hilang, 
+    latitude, 
+    longitude, 
+    id
+  ];
+  
+  const result = await pool.query(query, values);
+  return result.rows[0];
 }
 
 async function deleteById(id) {
-  const { rows } = await pool.query('DELETE FROM aset_inventaris WHERE id = $1 RETURNING *', [id]);
-  return rows[0];
+  const query = 'DELETE FROM aset_inventaris WHERE id = $1 RETURNING *';
+  const result = await pool.query(query, [id]);
+  return result.rows[0];
 }
 
-module.exports = { create, findAll, findById, updateById, deleteById };
+async function getByStatus(status) {
+  const query = `
+    SELECT 
+      id,
+      nama_aset,
+      category,
+      location,
+      status_aset,
+      assigned_to,
+      peminjam,
+      status_hilang,
+      latitude,
+      longitude,
+      last_updated
+    FROM aset_inventaris 
+    WHERE status_aset = $1
+    ORDER BY id ASC
+  `;
+  const result = await pool.query(query, [status]);
+  return result.rows;
+}
+
+async function getByCategory(category) {
+  const query = `
+    SELECT 
+      id,
+      nama_aset,
+      category,
+      location,
+      status_aset,
+      assigned_to,
+      peminjam,
+      status_hilang,
+      latitude,
+      longitude,
+      last_updated
+    FROM aset_inventaris 
+    WHERE category = $1
+    ORDER BY id ASC
+  `;
+  const result = await pool.query(query, [category]);
+  return result.rows;
+}
+
+async function getByLocation(location) {
+  const query = `
+    SELECT 
+      id,
+      nama_aset,
+      category,
+      location,
+      status_aset,
+      assigned_to,
+      peminjam,
+      status_hilang,
+      latitude,
+      longitude,
+      last_updated
+    FROM aset_inventaris 
+    WHERE location = $1
+    ORDER BY id ASC
+  `;
+  const result = await pool.query(query, [location]);
+  return result.rows;
+}
+
+module.exports = {
+  getAll,
+  getById,
+  create,
+  updateById,
+  deleteById,
+  getByStatus,
+  getByCategory,
+  getByLocation
+};

@@ -1,66 +1,111 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { authAPI } from '../utils/api';
 
-const LoginForm: React.FC = () => {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
+export default function LoginForm() {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        // Handle login logic here
-        console.log('Username:', username);
-        console.log('Password:', password);
-    };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    setError('');
+  };
 
-    return (
-        <form
-            onSubmit={handleSubmit}
-            className="space-y-6"
-        >
-            {/* ...existing form fields... */}
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      await authAPI.login(formData);
+      
+      // Redirect to dashboard using navigate
+      navigate('/');
+      
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-blue-600">
+            Sign in to your account
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Access laboratory asset management
+          </p>
+        </div>
+        
+        {error && (
+          <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
+
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm space-y-4">
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="username">
-                    Username
-                </label>
-                <input
-                    type="text"
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    placeholder="Enter your username"
-                    required
-                />
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                Username or Email
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                value={formData.username}
+                onChange={handleChange}
+                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="username or email"
+              />
             </div>
+
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
-                    Password
-                </label>
-                <div className="relative">
-                    <input
-                        type={showPassword ? 'text' : 'password'}
-                        id="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        placeholder="Enter your password"
-                        required
-                    />
-                </div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                value={formData.password}
+                onChange={handleChange}
+                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+              />
             </div>
+          </div>
+
+          <div>
             <button
-                type="submit"
-                className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150"
+              type="submit"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                Login
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
-            <div className="flex justify-between text-sm mt-2">
-                <a href="#" className="text-blue-500 hover:underline">Forgot password?</a>
-                {/* changed link -> navigates to #register */}
-                <a href="#register" className="text-blue-500 hover:underline">Register</a>
-            </div>
-        </form>
-    );
-};
+          </div>
 
-export default LoginForm;
+          <div className="text-center">
+            <a href="/register" className="text-sm text-blue-600 hover:text-blue-500">
+              Don't have an account? Register
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
