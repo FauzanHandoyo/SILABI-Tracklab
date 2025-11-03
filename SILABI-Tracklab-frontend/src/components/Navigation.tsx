@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import trackLabLogo from '../assets/tracklab-logo.jpg';
 
 const Navigation: React.FC = () => {
   const location = useLocation();
@@ -22,14 +23,7 @@ const Navigation: React.FC = () => {
   return (
     <nav className="flex items-center justify-between px-6 py-4 bg-white rounded-t-2xl shadow border-b">
       <div className="flex items-center gap-3">
-        <div className="bg-blue-100 rounded-full p-2">
-          <svg width="28" height="28" fill="none" viewBox="0 0 24 24">
-            <rect width="24" height="24" rx="6" fill="#2563eb"/>
-            <path d="M8 10V8a4 4 0 118 0v2" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
-            <rect x="6" y="10" width="12" height="8" rx="2" fill="#fff"/>
-            <circle cx="12" cy="14" r="2" fill="#2563eb"/>
-          </svg>
-        </div>
+        <img src={trackLabLogo} alt="TrackLab Logo" className="h-16 w-36 rounded-full object-cover" />
         <div>
           <span className="font-bold text-lg text-gray-900">SILABI</span>
         </div>

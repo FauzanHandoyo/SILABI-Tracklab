@@ -89,14 +89,6 @@ const Dashboard: React.FC = () => {
     <div className="p-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <div className="bg-blue-100 rounded-full p-3">
-          <svg width="32" height="32" fill="none" viewBox="0 0 24 24">
-            <rect width="24" height="24" rx="6" fill="#2563eb"/>
-            <path d="M8 10V8a4 4 0 118 0v2" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
-            <rect x="6" y="10" width="12" height="8" rx="2" fill="#fff"/>
-            <circle cx="12" cy="14" r="2" fill="#2563eb"/>
-          </svg>
-        </div>
         <div>
           <div className="font-bold text-xl text-gray-900">SILABI</div>
           <div className="text-gray-500 text-sm">Central Dashboard</div>
