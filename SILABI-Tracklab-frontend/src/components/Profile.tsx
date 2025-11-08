@@ -1,154 +1,213 @@
 import React, { useEffect, useState } from 'react';
-import { authAPI, userAPI } from '../utils/api';
-import trackLabLogo from '../assets/tracklab-logo.jpg';
+import { userAPI } from '../utils/api';
 
-type User = {
-  id: number;
-  full_name?: string;
-  email?: string;
-  username?: string;
-  role?: string;
-  created_at?: string;
-  last_login?: string;
-};
-
-export default function Profile(): JSX.Element {
-  const [user, setUser] = useState<User | null>(null);
-  const [form, setForm] = useState({ full_name: '', email: '', username: '' });
+export default function Profile() {
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    username: '',
+    role: '',
+    created_at: ''
+  });
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    const stored = authAPI.getCurrentUser();
-    if (stored) {
-      setUser(stored);
-      setForm({
-        full_name: stored.full_name || stored.name || '',
-        email: stored.email || '',
-        username: stored.username || ''
-      });
-
-      // try fetch fresh data from backend
-      (async () => {
-        try {
-          const res = await userAPI.getById(stored.id);
-          if (res?.data) {
-            setUser(res.data);
-            setForm({
-              full_name: res.data.full_name || '',
-              email: res.data.email || '',
-              username: res.data.username || ''
-            });
-          }
-        } catch (err) {
-          // ignore — keep stored data
-          console.error('Fetch profile failed', err);
-        }
-      })();
-    }
+    loadProfile();
   }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await userAPI.getCurrentUser();
+      setFormData({
+        full_name: response.data.full_name || '',
+        email: response.data.email || '',
+        username: response.data.username || '',
+        role: response.data.role || '',
+        created_at: response.data.created_at || ''
+      });
+      setError('');
+    } catch (err: any) {
+      console.error('Error loading profile:', err);
+      setError('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    setSuccess('');
+    setError('');
   };
 
-  const handleSave = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!user) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSaving(true);
-    setMessage(null);
+    setError('');
+    setSuccess('');
+
     try {
-      const payload = {
-        full_name: form.full_name || null,
-        email: form.email || null,
-        username: form.username || null
+      const updateData = {
+        full_name: formData.full_name,
+        email: formData.email,
+        username: formData.username
       };
-      const res = await userAPI.update(user.id, payload);
-      setUser(res.data);
-      setMessage('Profile updated');
-    } catch (err) {
-      console.error('Update profile failed', err);
-      setMessage('Failed to update profile');
+
+      const response = await userAPI.updateCurrentUser(updateData);
+      
+      // Update localStorage with new user data
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const updatedUser = { ...currentUser, ...response.data.user };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      setSuccess('Profile updated successfully!');
+      
+      // Reload profile to get latest data
+      await loadProfile();
+    } catch (err: any) {
+      console.error('Error updating profile:', err);
+      setError(err.response?.data?.error || 'Failed to update profile');
     } finally {
       setSaving(false);
-      setTimeout(() => setMessage(null), 3000);
     }
   };
 
-  if (!user) {
-    return <div className="p-4">Not signed in.</div>;
+  const handleReset = () => {
+    loadProfile();
+    setSuccess('');
+    setError('');
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   return (
-    <div className="p-6 max-w-2xl">
-      <div className="flex items-center gap-4 mb-6">
-        <img src={trackLabLogo} alt="avatar" className="h-16 w-16 rounded-full object-cover" />
-        <div>
-          <h2 className="text-xl font-semibold">{form.full_name || form.username}</h2>
-          <div className="text-sm text-gray-500">Role: {user.role || 'user'}</div>
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+            {formData.full_name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{formData.full_name}</h1>
+            <p className="text-gray-600">Role: {formData.role}</p>
+          </div>
+        </div>
+
+        {/* Profile Form */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 rounded">
+              <p className="text-red-700">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-400 rounded">
+              <p className="text-green-700">{success}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1">
+                  Full name
+                </label>
+                <input
+                  type="text"
+                  id="full_name"
+                  name="full_name"
+                  value={formData.full_name}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={saving}
+                className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Reset
+              </button>
+            </div>
+          </form>
+
+          {formData.created_at && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-600">
+                Member since: {formatDate(formData.created_at)}
+              </p>
+            </div>
+          )}
         </div>
       </div>
-
-      <form onSubmit={handleSave} className="bg-white p-4 rounded shadow">
-        <label className="block mb-2">
-          <div className="text-sm text-gray-600">Full name</div>
-          <input
-            name="full_name"
-            value={form.full_name}
-            onChange={handleChange}
-            className="w-full mt-1 px-3 py-2 border rounded"
-          />
-        </label>
-
-        <label className="block mb-2">
-          <div className="text-sm text-gray-600">Email</div>
-          <input
-            name="email"
-            value={form.email}
-            onChange={handleChange}
-            className="w-full mt-1 px-3 py-2 border rounded"
-            type="email"
-          />
-        </label>
-
-        <label className="block mb-2">
-          <div className="text-sm text-gray-600">Username</div>
-          <input
-            name="username"
-            value={form.username}
-            onChange={handleChange}
-            className="w-full mt-1 px-3 py-2 border rounded"
-          />
-        </label>
-
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setForm({
-                full_name: user.full_name || '',
-                email: user.email || '',
-                username: user.username || ''
-              });
-              setMessage(null);
-            }}
-            className="px-3 py-2 bg-gray-200 rounded"
-          >
-            Reset
-          </button>
-        </div>
-
-        {message && <div className="mt-3 text-sm text-gray-700">{message}</div>}
-        <div className="mt-3 text-xs text-gray-500">Member since: {user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}</div>
-      </form>
     </div>
   );
 }
