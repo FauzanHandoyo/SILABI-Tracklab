@@ -2,11 +2,13 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import Assets from './pages/Assets';
 import History from './pages/History';
 import Notifications from './pages/Notifications';
 import { authAPI } from './utils/api';
+import ProfilePage from './pages/Profile';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -59,6 +61,13 @@ function App() {
           />
           
           {/* Protected routes */}
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile/>
+              </ProtectedRoute>}
+          />
           <Route 
             path="/" 
             element={

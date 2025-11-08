@@ -29,6 +29,7 @@ const Navigation: React.FC = () => {
         </div>
       </div>
       <div className="flex items-center gap-4">
+        <Link to="/profile" className={getLinkClass('/profile')}>Profile</Link>
         <Link to="/" className={getLinkClass('/')}>Dashboard</Link>
         <Link to="/assets" className={getLinkClass('/assets')}>Assets</Link>
         <Link to="/history" className={getLinkClass('/history')}>History</Link>
