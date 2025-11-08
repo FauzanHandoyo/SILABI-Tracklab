@@ -39,6 +39,7 @@ export const userAPI = {
   getById: (id) => api.get(`/users/${id}`),
   getCurrentUser: () => api.get('/users/me'),
   updateCurrentUser: (data) => api.put('/users/me', data),
+  changePassword: (data) => api.put('/users/me/change-password', data),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`)

@@ -98,14 +98,13 @@ async function updateUser(req, res) {
 async function updateCurrentUser(req, res) {
   try {
     const userId = req.user.id;
-    const { full_name, email, username, password } = req.body;
+    const { full_name, email, username } = req.body;
     
-    // Build update object
+    // Build update object (exclude password - use separate endpoint)
     const updateData = {};
     if (full_name) updateData.full_name = full_name;
     if (email) updateData.email = email;
     if (username) updateData.username = username;
-    if (password) updateData.password = password;
     
     const user = await model.updateById(userId, updateData);
     if (!user) {
@@ -122,6 +121,65 @@ async function updateCurrentUser(req, res) {
   } catch (err) {
     console.error('Update profile error:', err);
     res.status(500).json({ error: 'Failed to update profile' });
+  }
+}
+
+async function changePassword(req, res) {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+    
+    console.log('Change password request for user:', userId);
+    
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+    
+    // Get user with password (use special function that includes password)
+    const user = await model.findByIdWithPassword(userId);
+    
+    console.log('User found:', user ? 'Yes' : 'No');
+    console.log('User has password field:', user && user.password ? 'Yes' : 'No');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (!user.password) {
+      console.error('User password is undefined');
+      return res.status(500).json({ error: 'Unable to verify password' });
+    }
+    
+    // Verify current password
+    console.log('Verifying current password...');
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    console.log('Current password valid:', isValidPassword);
+    
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    
+    // Hash new password
+    console.log('Hashing new password...');
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Update password
+    console.log('Updating password in database...');
+    await model.updateById(userId, { password: hashedPassword });
+    
+    console.log('Password changed successfully');
+    
+    res.json({ 
+      message: 'Password changed successfully' 
+    });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 }
 
@@ -149,5 +207,6 @@ module.exports = {
   getCurrentUser,
   updateUser,
   updateCurrentUser,
+  changePassword,
   deleteUser
 };

@@ -13,6 +13,7 @@ router.use(authenticate);
 // Current user profile routes
 router.get('/me', ctrl.getCurrentUser);
 router.put('/me', validateUser, ctrl.updateCurrentUser);
+router.put('/me/change-password', ctrl.changePassword);
 
 // Admin only routes
 router.get('/', authorize('admin'), ctrl.getAllUsers);
