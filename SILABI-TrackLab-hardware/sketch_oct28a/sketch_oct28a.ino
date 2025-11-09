@@ -1,177 +1,195 @@
+// --- Library BLE & WiFi (Wajib) ---
 #include "BLEDevice.h"
 #include "BLEScan.h"
-#include <vector> // Buat list dinamis
+#include <vector>
 #include <WiFi.h>
-#include <NeonPostgresOverHTTP.h>
-#include <ArduinoJson.h>
-#include <WiFiClientSecure.h>
 
-const char* ssid = "NAMA_WIFI_ANDA";
-const char* password = "PASSWORD_WIFI_ANDA";
-const char* neonUser = "neondb_owner";
-const char* neonPassword = "npg_x0vSCIQ9meRs";
-const char* neonHost = "ep-plain-butterfly-a190b73m-pooler.ap-southeast-1.aws.neon.tech";
-const char* neonDb = "neondb";
+// --- Library API (Ringan, Pengganti Neon) ---
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// --- Kredensial WiFi ---
+const char* ssid = "Drowsy";
+const char* password = "sleepyhead";
+
+// --- (PLACEHOLDER) Alamat API Backend ---
+// Ini server (Vercel or smth) yang kita buat nanti
+const char* apiHost = "http://api-silabi-anda.vercel.app"; 
 
 // === DAFTAR ASET ===
 std::vector<String> daftarAsetMaster;
 std::vector<bool> asetDitemukan;
 std::vector<String> statusAsetSebelumnya;
 
-WiFiClientSecure client;
-NeonPostgresOverHTTP neon(client);
+// --- [WATCHDOG] ---
+// Variabel untuk auto-restart
+long siklusLoop = 0;
+long siklusMaks = 100; // Restart setiap 100 siklus
+// --------------------
 
-// Variabel untuk proses scanning
 static BLEScan* pBLEScan;
-int scanTime = 12; // Durasi scan dalam detik
+int scanTime = 12; 
 
 // WiFI Connection
 void setupWiFi() {
-  Serial.println();
-  Serial.print("[WiFi] Menghubungkan ke: ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-
-  // Tunggu sampai WiFi terhubung
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("\n[WiFi] Berhasil terhubung!");
-  Serial.print("[WiFi] Alamat IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.println("----------------------------------------");
+  Serial.println();
+  Serial.print("[WiFi] Menghubungkan ke: ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n[WiFi] Berhasil terhubung!");
+  Serial.print("[WiFi] Alamat IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println("----------------------------------------");
 }
 
-// Fungsi ini akan dipanggil setiap kali ada BLE ditemukan
+// BLE Scanning
 class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice advertisedDevice) {
-      String deviceName = advertisedDevice.getName().c_str();
-
-      // Cek apakah nama perangkat diawali dengan prefix kita
-      if (deviceName.startsWith("SILABI_")) {
-        
-        // Tandai aset ini sebagai "ditemukan"
-        // Loop sekarang menggunakan .size() dari vector
-        for (int i = 0; i < daftarAsetMaster.size(); i++) {
-          if (deviceName == daftarAsetMaster[i]) {
-            asetDitemukan[i] = true;
-          }
-        }
-      }
-    }
+  void onResult(BLEAdvertisedDevice advertisedDevice) {
+    String deviceName = advertisedDevice.getName().c_str();
+    if (deviceName.startsWith("SILABI_")) {
+      for (int i = 0; i < daftarAsetMaster.size(); i++) {
+        if (deviceName == daftarAsetMaster[i]) {
+          asetDitemukan[i] = true;
+        }
+      }
+    }
+  }
 };
 
+// Ambil asset list (Placeholder)
 void sinkronkanDaftarAsetDariDB() {
-  Serial.println("[Neon] Memulai sinkronisasi daftar aset...");
-  daftarAsetMaster.clear();
-
-  const char* query = "SELECT nama_aset FROM daftar_aset";
-
-  JsonDocument doc;
-  
-  bool success = neon.exec(doc, query);
-  
-  if (success) {
-    Serial.println("[Neon] Respon diterima:");
-    serializeJsonPretty(doc, Serial);
-    Serial.println();
-
-    for (JsonObject row : doc.as<JsonArray>()) {
-      String namaAset = row["nama_aset"].as<String>();
-      daftarAsetMaster.push_back(namaAset);
-    }
-  } else {
-    Serial.println("[Neon] Gagal mengeksekusi query SELECT!");
-    Serial.println(neon.getErrorMessage());
-  }
-  
-  asetDitemukan.resize(daftarAsetMaster.size());
-  Serial.printf("[Neon] Sinkronisasi Selesai. Jumlah aset terdaftar: %d\n", daftarAsetMaster.size());
-  Serial.println("----------------------------------------");
-
-  asetDitemukan.resize(daftarAsetMaster.size());
-  statusAsetSebelumnya.resize(daftarAsetMaster.size(), "");
+  Serial.println("[Debug] Masuk ke sinkronkanDaftarAsetDariDB()...");
+  daftarAsetMaster.clear();
+  
+  // --- DATA TESTING ---
+  // Menggantikan API GET for now
+  daftarAsetMaster.push_back("SILABI_reactor"); 
+  
+  asetDitemukan.resize(daftarAsetMaster.size());
+  statusAsetSebelumnya.resize(daftarAsetMaster.size(), "");
+  Serial.printf("[Debug] Sinkronisasi Selesai. Jumlah aset terdaftar: %d\n", daftarAsetMaster.size());
 }
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("Memulai SILABI Gateway Scanner...");
+  Serial.begin(115200);
+  Serial.println("Memulai SILABI Gateway Scanner...");
 
-  setupWiFi();
-  neon.setConnection(neonHost, 443, neonUser, neonPassword, neonDb);
-  sinkronkanDaftarAsetDariDB();
+  // --- [DEBUG] ---
+  Serial.printf("[Debug] Sisa Heap setelah boot: %u bytes\n", ESP.getFreeHeap());
+  // -----------------
 
-  BLEDevice::init(""); // Inisialisasi BLE
-  pBLEScan = BLEDevice::getScan(); // Buat objek scan baru
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(true); // Scan aktif untuk mendapatkan nama
-  pBLEScan->setInterval(100);
-  pBLEScan->setWindow(99); // Scan hampir terus-menerus
+  setupWiFi();
+
+  // --- [DEBUG] ---
+  Serial.printf("[Debug] Sisa Heap setelah WiFi terhubung: %u bytes\n", ESP.getFreeHeap());
+  // -----------------
+  
+  sinkronkanDaftarAsetDariDB(); // Memuat data tes "SILABI_reactor"
+
+  Serial.println("[Debug] Inisialisasi BLE...");
+  BLEDevice::init("");
+  pBLEScan = BLEDevice::getScan();
+  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+  pBLEScan->setActiveScan(true);
+  pBLEScan->setInterval(100);
+  pBLEScan->setWindow(99);
+
+  // DO NOT DELETE ANY DEBUG CODE
+  // IT PREVENTS MEMORY LEAK FOR SOME REASON
+  // --- [DEBUG] ---
+  Serial.printf("[Debug] Sisa Heap setelah BLE init: %u bytes\n", ESP.getFreeHeap());
+  Serial.println("[Debug] setup() selesai. Masuk ke loop...");
+  // -----------------
 }
 
 void loop() {
-  Serial.println("\n--- Memulai Siklus Scan Baru ---");
+  // --- [DEBUG] ---
+  siklusLoop++;
+  Serial.println("\n--- Memulai Siklus Scan Baru ---");
+  Serial.printf("[Debug] Siklus loop ke-%ld. Sisa Heap: %u bytes\n", siklusLoop, ESP.getFreeHeap());
+  // -----------------
 
-  // Reset status penemuan
-  for (int i = 0; i < daftarAsetMaster.size(); i++) {
-    asetDitemukan[i] = false;
-  }
+  for (int i = 0; i < daftarAsetMaster.size(); i++) {
+    asetDitemukan[i] = false;
+  }
 
-  // Mulai scan BLE selama 'scanTime' detik
-  BLEScanResults* foundDevices = pBLEScan->start(scanTime, false);
-  
-  Serial.printf("Scan Selesai! Ditemukan %d perangkat BLE.\n", foundDevices->getCount());
-  Serial.println("--- Laporan Status Aset ---");
+  Serial.println("[Debug] Memulai BLE Scan...");
+  BLEScanResults* foundDevices = pBLEScan->start(scanTime, false);
+  Serial.println("[Debug] BLE Scan Selesai.");
+  
+  Serial.printf("Scan Selesai! Ditemukan %d perangkat BLE.\n", foundDevices->getCount());
+  Serial.println("--- Laporan Status Aset ---");
+  Serial.println("[Debug] Memeriksa status aset...");
+  
+  for (int i = 0; i < daftarAsetMaster.size(); i++) {
+    String namaAset = daftarAsetMaster[i];
+    String status;
+    if (asetDitemukan[i]) {
+      status = "DI TEMPAT";
+      Serial.printf("[OK] %s \t | Status: %s\n", namaAset.c_str(), status.c_str());
+    } else {
+      status = "HILANG/PINDAH";
+      Serial.printf("[!!] %s \t | Status: %s\n", namaAset.c_str(), status.c_str());
+    }
+    
+    // Cek perubahan status
+    if (status != statusAsetSebelumnya[i]) {
+      Serial.printf("[Debug] Status aset %s berubah! Memanggil kirimKeCloud...\n", namaAset.c_str());
+      kirimKeCloud(namaAset, status); // Panggil fungsi API
+      statusAsetSebelumnya[i] = status;
+    }
+  }
 
-  // Cek array asetDitemukan
-  for (int i = 0; i < daftarAsetMaster.size(); i++) {
-    String namaAset = daftarAsetMaster[i];
-    String status;
+  Serial.println("[Debug] Membersihkan hasil scan...");
+  pBLEScan->clearResults();
 
-    if (asetDitemukan[i]) {
-      status = "DI TEMPAT";
-      Serial.printf("[OK] %s \t | Status: %s\n", namaAset.c_str(), status.c_str());
-    } else {
-      status = "HILANG/PINDAH";
-      Serial.printf("[!!] %s \t | Status: %s\n", namaAset.c_str(), status.c_str());
-    }
-    if (status != statusAsetSebelumnya[i]) {
-    kirimKeCloud(namaAset, status);
-    statusAsetSebelumnya[i] = status; // Simpan status baru ke memori
-    }
-  }
+  // --- [DEBUG] ---
+  Serial.printf("[Debug] Sisa Heap setelah siklus selesai: %u bytes\n", ESP.getFreeHeap());
+  Serial.println("[Debug] loop() end. Delaying 10 detik...");
+  // -----------------
 
-  pBLEScan->clearResults(); // Bersihkan hasil scan sebelumnya
-  delay(10000); // Tunggu 10 detik sebelum memulai siklus scan baru
-  
-  // Ini bisa keep begini aja atau panggil sinkronkanDaftarAsetDariDB()
-  // di sini periodik (Ex. setiap jam) kalau mau
+  delay(10000);
+
+  // --- [WATCHDOG] for memory fix ---
+  if (siklusLoop >= siklusMaks) {
+    Serial.println("[Watchdog] Batas siklus tercapai. Me-restart untuk membersihkan RAM...");
+    delay(1000); // Beri waktu Serial untuk mengirim pesan
+    ESP.restart(); // RESTART PAKSA
+  }
+  // --------------------
 }
 
-
-// === FUNGSI PENGIRIMAN DATA ===
+// === PENGIRIMAN DATA ===
 void kirimKeCloud(String namaAset, String status) {
-  
-  const char* query = 
-    "INSERT INTO status_aset (nama, status, timestamp) "
-    "VALUES (?, ?, NOW()) "
-    "ON CONFLICT (nama) DO UPDATE SET status = EXCLUDED.status, timestamp = NOW()";
+  // Fungsi ini AKAN GAGAL for now
+  // karena server di 'apiHost' nggak ada
+  // WOnt crash at least.
+  
+  HTTPClient http;
+  String url = String(apiHost) + "/api/update-status"; 
 
-  // Siapkan parameter (Anti SQL Injection)
-  JsonDocument params;
-  params.add(namaAset);
-  params.add(status);
+  JsonDocument doc;
+  doc["nama"] = namaAset;
+  doc["status"] = status;
+  String jsonPayload;
+  serializeJson(doc, jsonPayload);
 
-  Serial.printf("[Neon] Mengirim status untuk: %s\n", namaAset.c_str());
-  
-  // Eksekusi query dengan parameter
-  if (neon.execParams(query, params.as<JsonArray>())) {
-    // Serial.println("[Neon] Status update terkirim.");
-  } else {
-    Serial.println("[Neon] GAGAL mengirim status!");
-    Serial.println(neon.getErrorMessage());
-  }
+  Serial.printf("[API] Mencoba mengirim status untuk: %s\n", namaAset.c_str());
+
+  if (http.begin(url)) {
+    http.addHeader("Content-Type", "application/json");
+    int httpCode = http.POST(jsonPayload);
+    if (httpCode > 0) {
+      Serial.printf("[API] Status terkirim, HTTP code: %d\n", httpCode);
+    } else {
+      Serial.printf("[API] Gagal mengirim status! Error: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+  } else {
+    Serial.println("[API] Gagal memulai koneksi HTTP.");
+  }
 }
