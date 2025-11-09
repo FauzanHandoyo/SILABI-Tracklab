@@ -1,234 +1,189 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react';
+import { historyAPI } from '../utils/api';
 
-type HistoryEntry = {
-    id: string
-    assetId: string
-    name?: string
-    t: string // ISO timestamp
-    rssi: number
-    status: string
+interface HistoryRecord {
+  id: number;
+  asset_id: number;
+  nama_aset: string;
+  event_type: string;
+  old_status: string | null;
+  new_status: string | null;
+  old_location: string | null;
+  new_location: string | null;
+  rssi: number | null;
+  timestamp: string;
 }
 
-type Props = {
-    endpoint?: string
-}
+export default function History() {
+  const [history, setHistory] = useState<HistoryRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [timeFilter, setTimeFilter] = useState('7');
 
-export default function History({ endpoint = '/api/history' }: Props): React.ReactElement {
-    const [data, setData] = useState<HistoryEntry[]>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    const [query, setQuery] = useState('')
-    const [days, setDays] = useState<number>(7)
+  useEffect(() => {
+    loadHistory();
+  }, [timeFilter]);
 
-    useEffect(() => {
-        const controller = new AbortController()
-        let isMounted = true
+  const loadHistory = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await historyAPI.getAll({
+        days: timeFilter,
+        limit: 100
+      });
+      setHistory(response.data);
+    } catch (err: any) {
+      console.error('Error loading history:', err);
+      setError('Failed to load history');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        async function load() {
-            setLoading(true)
-            setError(null)
-
-            try {
-                // Check if backend is available
-                const res = await fetch(endpoint, { 
-                    signal: controller.signal,
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                })
-                
-                // Handle non-JSON responses
-                const contentType = res.headers.get('content-type')
-                if (!contentType?.includes('application/json')) {
-                    throw new Error('Backend unavailable - using mock data')
-                }
-
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}`)
-                }
-
-                const json = await res.json()
-                if (!isMounted) return
-
-                if (Array.isArray(json) && isHistoryArray(json)) {
-                    setData(json)
-                } else {
-                    console.warn('Invalid API response format - using mock data')
-                    setData(mockHistory())
-                }
-            } catch (err: any) {
-                if (err.name === 'AbortError') return
-                console.warn('History load failed:', err.message)
-                // Use mock data for development
-                setData(mockHistory())
-                setError('Using mock data - ' + err.message)
-            } finally {
-                if (isMounted) setLoading(false)
-            }
-        }
-
-        load()
-        return () => {
-            isMounted = false
-            controller.abort()
-        }
-    }, [endpoint])
-
-    // --- Derived filters ---
-    const cutoff = useMemo(() => {
-        const d = new Date()
-        d.setDate(d.getDate() - days)
-        return d
-    }, [days])
-
-    const filtered = useMemo(() => {
-        return data
-            .map((h) => ({ ...h, parsedTime: new Date(h.t) }))
-            .filter((h) => !isNaN(h.parsedTime.getTime()))
-            .filter((h) => h.parsedTime >= cutoff)
-            .filter(
-                (h) =>
-                    !query ||
-                    h.assetId.toLowerCase().includes(query.toLowerCase()) ||
-                    (h.name && h.name.toLowerCase().includes(query.toLowerCase()))
-            )
-            .sort((a, b) => b.parsedTime.getTime() - a.parsedTime.getTime())
-    }, [data, cutoff, query])
-
-    // --- Render ---
+  const filteredHistory = history.filter(record => {
+    const searchLower = search.toLowerCase();
+    const assetId = `LAB-${String(record.asset_id).padStart(3, '0')}`;
     return (
-        <div className="min-h-screen bg-gray-100">
-            <div className="p-4">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-2xl font-semibold">History</h1>
-                    <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-600">Last</label>
-                    <select
-                        value={days}
-                        onChange={(e) => setDays(Number(e.target.value))}
-                        className="border rounded px-2 py-1"
-                    >
-                        <option value={1}>1d</option>
-                        <option value={7}>7d</option>
-                        <option value={30}>30d</option>
-                        <option value={90}>90d</option>
-                    </select>
-                </div>
-            </div>
+      record.nama_aset?.toLowerCase().includes(searchLower) ||
+      assetId.toLowerCase().includes(searchLower)
+    );
+  });
 
-            {/* Search Bar */}
-            <div className="mb-4 flex items-center gap-2">
-                <input
-                    aria-label="Search history"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search by asset id or name"
-                    className="flex-1 border rounded px-3 py-2"
-                    disabled={loading}
-                />
-                <div className="text-sm text-gray-500">
-                    {loading ? 'Loading…' : `${filtered.length} records`}
-                </div>
-            </div>
+  const getStatusBadge = (status: string | null) => {
+    if (!status) return null;
+    
+    const statusMap: Record<string, { bg: string; text: string }> = {
+      'Tersedia': { bg: 'bg-green-100', text: 'text-green-700' },
+      'Present': { bg: 'bg-green-100', text: 'text-green-700' },
+      'Dipinjam': { bg: 'bg-gray-900', text: 'text-white' },
+      'Missing': { bg: 'bg-red-100', text: 'text-red-700' },
+      'Dalam Perbaikan': { bg: 'bg-yellow-100', text: 'text-yellow-700' }
+    };
 
-            {error && <div className="text-red-600 mb-3">{error}</div>}
+    const style = statusMap[status] || { bg: 'bg-gray-100', text: 'text-gray-700' };
+    
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}>
+        {status}
+      </span>
+    );
+  };
 
-            {/* Table */}
-            <div className="overflow-auto bg-white rounded shadow">
-                <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50 text-left text-gray-600">
-                        <tr>
-                            <th className="px-4 py-2">Time</th>
-                            <th className="px-4 py-2">Asset</th>
-                            <th className="px-4 py-2">RSSI</th>
-                            <th className="px-4 py-2">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr>
-                                <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
-                                    Loading…
-                                </td>
-                            </tr>
-                        ) : filtered.length > 0 ? (
-                            filtered.map((h) => (
-                                <tr key={h.id} className="border-t last:border-b">
-                                    <td className="px-4 py-3 align-top w-48">
-                                        <div className="text-xs text-gray-500">{formatDate(h.t)}</div>
-                                        <div className="text-xs text-gray-400">
-                                            {new Date(h.t).toLocaleTimeString()}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="font-medium">{h.name ?? h.assetId}</div>
-                                        <div className="text-xs text-gray-500">{h.assetId}</div>
-                                    </td>
-                                    <td className="px-4 py-3">{h.rssi} dBm</td>
-                                    <td className="px-4 py-3">
-                                        <span
-                                            className={`px-2 py-1 rounded text-xs ${
-                                                h.status === 'Present'
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : h.status === 'Missing'
-                                                    ? 'bg-red-100 text-red-800'
-                                                    : 'bg-yellow-100 text-yellow-800'
-                                            }`}
-                                        >
-                                            {h.status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
-                                    No records found.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return {
+      date: date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+    };
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">History</h1>
+        <div className="flex items-center gap-2">
+          <span className="text-gray-600">Last</span>
+          <select
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="1">1d</option>
+            <option value="7">7d</option>
+            <option value="30">30d</option>
+            <option value="90">90d</option>
+          </select>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search by asset id or name"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
+      <div className="text-right text-gray-500 mb-2">{filteredHistory.length} records</div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 rounded">
+          <p className="text-red-700">{error}</p>
+        </div>
+      )}
+
+      {/* History Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Time
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Asset
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                RSSI
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredHistory.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  No history records found
+                </td>
+              </tr>
+            ) : (
+              filteredHistory.map((record) => {
+                const { date, time } = formatTimestamp(record.timestamp);
+                const assetId = `LAB-${String(record.asset_id).padStart(3, '0')}`;
+                
+                return (
+                  <tr key={record.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{date}</div>
+                      <div className="text-sm text-gray-500">{time}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">
+                        {record.nama_aset || 'Unknown Asset'}
+                      </div>
+                      <div className="text-sm text-gray-500">{assetId}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {record.rssi ? `${record.rssi} dBm` : '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(record.new_status)}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-    )
-}
-
-// --- Helpers ---
-function formatDate(iso: string): string {
-    const d = new Date(iso)
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString()
-}
-
-function isHistoryArray(arr: unknown[]): arr is HistoryEntry[] {
-    return arr.every((item) => {
-        if (typeof item !== 'object' || item === null) return false
-        const anyItem = item as any
-        return (
-            typeof anyItem.id === 'string' &&
-            typeof anyItem.assetId === 'string' &&
-            typeof anyItem.t === 'string' &&
-            typeof anyItem.rssi === 'number' &&
-            typeof anyItem.status === 'string'
-        )
-    })
-}
-
-function mockHistory(): HistoryEntry[] {
-    const now = Date.now()
-    const statuses = ['Present', 'Inactive', 'Missing']
-    return Array.from({ length: 100 }, (_, i) => {
-        const t = new Date(now - i * 1000 * 60 * 15).toISOString()
-        const rssi = Math.floor(-80 + Math.random() * 50)
-        return {
-            id: `h_${i}`,
-            assetId: `TAG-${1000 + (i % 12)}`,
-            name: `Asset ${(i % 12) + 1}`,
-            t,
-            rssi,
-            status: statuses[Math.floor(Math.random() * statuses.length)],
-        }
-    })
+  );
 }

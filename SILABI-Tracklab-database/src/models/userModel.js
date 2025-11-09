@@ -29,6 +29,14 @@ async function findById(id) {
   return rows[0];
 }
 
+async function findByIdWithPassword(id) {
+  const { rows } = await pool.query(
+    'SELECT * FROM users WHERE id = $1',
+    [id]
+  );
+  return rows[0];
+}
+
 async function findByEmail(email) {
   const { rows } = await pool.query(
     'SELECT * FROM users WHERE email = $1',
@@ -75,4 +83,13 @@ async function deleteById(id) {
   return rows[0];
 }
 
-module.exports = { create, findAll, findById, findByEmail, findByUsername, updateById, deleteById };
+module.exports = { 
+  create, 
+  findAll, 
+  findById, 
+  findByIdWithPassword,
+  findByEmail, 
+  findByUsername, 
+  updateById, 
+  deleteById 
+};

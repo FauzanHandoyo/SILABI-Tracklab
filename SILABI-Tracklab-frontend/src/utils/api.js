@@ -37,6 +37,9 @@ api.interceptors.response.use(
 export const userAPI = {
   getAll: () => api.get('/users'),
   getById: (id) => api.get(`/users/${id}`),
+  getCurrentUser: () => api.get('/users/me'),
+  updateCurrentUser: (data) => api.put('/users/me', data),
+  changePassword: (data) => api.put('/users/me/change-password', data),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`)
@@ -57,11 +60,24 @@ export const assetAPI = {
   getStats: () => api.get('/aset/stats')
 };
 
+export const historyAPI = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.asset_id) params.append('asset_id', filters.asset_id);
+    if (filters.days) params.append('days', filters.days);
+    if (filters.event_type) params.append('event_type', filters.event_type);
+    if (filters.limit) params.append('limit', filters.limit);
+    return api.get(`/history?${params.toString()}`);
+  },
+  getById: (id) => api.get(`/history/${id}`),
+  getByAssetId: (assetId, limit) => api.get(`/history/asset/${assetId}?limit=${limit || 50}`),
+  create: (data) => api.post('/history', data)
+};
+
 export const authAPI = {
   register: (data) => api.post('/users/register', data),
   login: async (data) => {
     const response = await api.post('/auth/login', data);
-    // Store token and user data
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
