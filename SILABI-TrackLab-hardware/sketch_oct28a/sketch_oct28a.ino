@@ -14,7 +14,7 @@ const char* password = "sleepyhead";
 
 // --- (PLACEHOLDER) Alamat API Backend ---
 // Ini server (Vercel or smth) yang kita buat nanti
-const char* apiHost = "http://api-silabi-anda.vercel.app"; 
+const char* apiHost = "https://backend-hardware-2zwlwl93w-fauzanhandoyos-projects.vercel.app"; 
 
 // === DAFTAR ASET ===
 std::vector<String> daftarAsetMaster;
