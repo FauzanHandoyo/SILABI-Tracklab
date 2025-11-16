@@ -1,14 +1,19 @@
 const pool = require('../../db');
+const bcrypt = require('bcrypt');
 
 async function create(data) {
   const { full_name, email, username, password, role } = data;
+  
+  // Hash password before storing
+  const hashedPassword = await bcrypt.hash(password, 10);
+  
   const q = `INSERT INTO users (full_name, email, username, password, role)
              VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, email, username, role, is_active, email_verified, created_at`;
   const { rows } = await pool.query(q, [
     full_name,
     email,
     username,
-    password, // TODO: hash with bcrypt before storing
+    hashedPassword, // Use hashed password instead of plain text
     role || 'user'
   ]);
   return rows[0];
