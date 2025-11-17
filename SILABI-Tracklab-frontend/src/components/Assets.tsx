@@ -26,23 +26,29 @@ export default function Assets() {
         const fetchAssets = async () => {
             try {
                 const response = await assetAPI.getAll()
+                console.log('Backend response:', response.data);
+                
                 // Transform backend data to match frontend type
-                const transformedData = response.data.map((asset: any) => ({
-                    id: `LAB-${String(asset.id).padStart(3, '0')}`,
-                    rawId: asset.id, // keep numeric id for edit/delete
-                    name: asset.nama_aset,
-                    assetType: asset.category || 'Unknown',
-                    location: asset.location || 'Unknown',
-                    lastSeen: asset.last_updated || new Date().toISOString(),
-                    rssi: asset.latitude && asset.longitude ? -60 : 0,
-                    status: asset.status_hilang 
-                        ? 'Missing' 
-                        : asset.status_aset === 'Tersedia' 
-                        ? 'Present' 
-                        : asset.status_aset === 'Dipinjam'
-                        ? 'Inactive'
-                        : 'Inactive'
-                }))
+                const transformedData = response.data.map((asset: any) => {
+                    console.log('Transforming asset:', asset);
+                    return {
+                        id: `LAB-${String(asset.id).padStart(3, '0')}`,
+                        rawId: Number(asset.id), // Ensure it's a number
+                        name: asset.nama_aset,
+                        assetType: asset.category || 'Unknown',
+                        location: asset.location || 'Unknown',
+                        lastSeen: asset.last_updated || new Date().toISOString(),
+                        rssi: asset.latitude && asset.longitude ? -60 : 0,
+                        status: asset.status_hilang 
+                            ? 'Missing' 
+                            : asset.status_aset === 'Tersedia' 
+                            ? 'Present' 
+                            : asset.status_aset === 'Dipinjam'
+                            ? 'Inactive'
+                            : 'Inactive'
+                    }
+                })
+                console.log('Transformed assets:', transformedData);
                 setAssets(transformedData)
                 setError(null)
             } catch (err) {
@@ -112,10 +118,22 @@ export default function Assets() {
     }
 
     const handleDelete = async (a: any) => {
+        console.log('Delete called with asset:', a);
+        console.log('rawId:', a.rawId);
+        
+        if (!a.rawId) {
+            setError('Invalid asset ID');
+            console.error('Asset rawId is undefined');
+            return;
+        }
+        
         if (!confirm(`Delete asset ${a.name}?`)) return;
+        
         try {
+            console.log('Deleting asset with rawId:', a.rawId);
             await assetAPI.delete(a.rawId)
             setAssets(prev => prev.filter(x => x.rawId !== a.rawId))
+            setError(null)
         } catch (err) {
             console.error('Delete failed', err)
             setError('Failed to delete asset')
