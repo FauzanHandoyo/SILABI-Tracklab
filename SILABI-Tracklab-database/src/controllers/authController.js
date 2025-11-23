@@ -1,6 +1,7 @@
 const model = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { validateEmail, isValidEmailFormat } = require('../services/emailValidator');
 
 function generateToken(user) {
   return jwt.sign(
@@ -13,6 +14,87 @@ function generateToken(user) {
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
+}
+
+async function register(req, res) {
+  try {
+    const { full_name, email, username, password, role } = req.body;
+    
+    console.log('Registration attempt:', { full_name, email, username, role });
+    
+    // Basic format validation
+    if (!isValidEmailFormat(email)) {
+      return res.status(400).json({ 
+        error: 'Invalid email format' 
+      });
+    }
+    
+    console.log('Validating email with Verifalia...');
+    
+    // Verifalia validation
+    const validation = await validateEmail(email);
+    
+    if (!validation.isValid) {
+      console.log('Email validation failed:', validation.status);
+      return res.status(400).json({ 
+        error: 'Email address is invalid or does not exist' 
+      });
+    }
+    
+    console.log('Email validation passed');
+    
+    // Check if email already exists
+    const existingEmail = await model.findByEmail(email);
+    if (existingEmail) {
+      console.log('Email already registered:', email);
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+    
+    // Check if username already exists
+    const existingUsername = await model.findByUsername(username);
+    if (existingUsername) {
+      console.log('Username already taken:', username);
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+    
+    // Create user
+    const newUser = await model.create({
+      full_name,
+      email,
+      username,
+      password,
+      role: role || 'user'
+    });
+    
+    console.log('User created successfully:', newUser.id);
+    
+    // Generate JWT token
+    const token = generateToken(newUser);
+    
+    // Return user data (excluding password)
+    const { password: _, ...userData } = newUser;
+    
+    res.status(201).json({
+      message: 'Registration successful',
+      token,
+      user: userData
+    });
+    
+  } catch (err) {
+    console.error('Registration error:', err);
+    
+    // Handle PostgreSQL unique constraint violation
+    if (err.code === '23505') {
+      if (err.constraint === 'users_email_key') {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+      if (err.constraint === 'users_username_key') {
+        return res.status(409).json({ error: 'Username already taken' });
+      }
+    }
+    
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
 }
 
 async function login(req, res) {
@@ -34,8 +116,6 @@ async function login(req, res) {
     }
     
     console.log('Comparing passwords...');
-    console.log('Input password:', password);
-    console.log('Stored hash:', user.password);
     
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
@@ -97,4 +177,4 @@ async function verifyToken(req, res) {
   }
 }
 
-module.exports = { login, verifyToken };
+module.exports = { register, login, verifyToken };

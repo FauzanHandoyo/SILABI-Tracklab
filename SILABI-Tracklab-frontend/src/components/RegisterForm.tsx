@@ -28,10 +28,30 @@ export default function RegisterForm() {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    // Client-side validation
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await authAPI.register(formData);
+      const response = await authAPI.register({
+        full_name: formData.full_name,
+        email: formData.email,
+        username: formData.username,
+        password: formData.password,
+        role: formData.role
+      });
+
+      console.log('Registration successful:', response.data);
       setSuccess('Registration successful! Redirecting to login...');
       
       // Redirect to login after 2 seconds
@@ -39,7 +59,27 @@ export default function RegisterForm() {
         navigate('/login');
       }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      console.error('Registration error:', err);
+      
+      // Handle specific error messages from backend
+      if (err.response?.data?.error) {
+        const errorMsg = err.response.data.error;
+        
+        // Provide user-friendly messages
+        if (errorMsg.includes('Email already registered')) {
+          setError('This email is already registered. Please use a different email or login.');
+        } else if (errorMsg.includes('Username already taken')) {
+          setError('This username is already taken. Please choose a different username.');
+        } else if (errorMsg.includes('Invalid email format')) {
+          setError('Please enter a valid email address.');
+        } else if (errorMsg.includes('Email address is invalid or does not exist')) {
+          setError('This email address appears to be invalid. Please check and try again.');
+        } else {
+          setError(errorMsg);
+        }
+      } else {
+        setError('Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -58,14 +98,14 @@ export default function RegisterForm() {
         </div>
         
         {error && (
-          <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
-            {error}
+          <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+            <span className="block sm:inline">{error}</span>
           </div>
         )}
         
         {success && (
-          <div className="bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded">
-            {success}
+          <div className="bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+            <span className="block sm:inline">{success}</span>
           </div>
         )}
 

@@ -75,7 +75,7 @@ export const historyAPI = {
 };
 
 export const authAPI = {
-  register: (data) => api.post('/users/register', data),
+  register: (data) => api.post('/auth/register', data),
   login: async (data) => {
     const response = await api.post('/auth/login', data);
     if (response.data.token) {
