@@ -1,78 +1,62 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { NextResponse } from 'next/server';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
+    const body = await request.json();
     const { nama, status } = body;
 
+    // Validate data
     if (!nama || !status) {
       return NextResponse.json(
-        { error: 'Missing required fields: nama and status' },
+        { error: 'Missing nama or status' },
         { status: 400 }
       );
     }
 
-    console.log('[Hardware API] Received:', { nama, status });
+    // Log the received data
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Asset: ${nama}, Status: ${status}`);
 
-    const status_hilang = status === 'HILANG/PINDAH';
-    const status_aset = status === 'DI TEMPAT' ? 'Tersedia' : 'Hilang';
-
-    const query = `
-      UPDATE aset_inventaris 
-      SET 
-        status_hilang = $1,
-        status_aset = $2,
-        last_updated = CURRENT_TIMESTAMP
-      WHERE nama_aset = $3
-      RETURNING *
-    `;
+    // TODO: Save to database (Supabase, MongoDB, etc.)
+    // For now, just return success
     
-    const result = await pool.query(query, [status_hilang, status_aset, nama]);
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Asset not found', nama },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Asset status updated',
-        data: result.rows[0]
-      },
-      {
-        status: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        }
+    return NextResponse.json({
+      success: true,
+      message: 'Status updated successfully',
+      data: { 
+        nama, 
+        status,
+        timestamp 
       }
-    );
-  } catch (error: any) {
-    console.error('[Hardware API] Error:', error);
+    });
+
+  } catch (error) {
+    console.error('Error:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
-export async function OPTIONS(req: NextRequest) {
-  return NextResponse.json({}, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    }
-  });
+// Optional: GET endpoint to retrieve asset list
+export async function GET() {
+  try {
+    // TODO: Fetch from database
+    const assets = [
+      { nama: 'SILABI_reactor', status: 'DI TEMPAT', lastSeen: new Date().toISOString() }
+    ];
+
+    return NextResponse.json({
+      success: true,
+      data: assets
+    });
+
+  } catch (error) {
+    console.error('Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }

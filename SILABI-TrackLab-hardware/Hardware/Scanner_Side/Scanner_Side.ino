@@ -5,129 +5,166 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 
-std::vector<String> daftarAsetMaster;
-std::vector<bool> asetDitemukan;
-std::vector<String> statusAsetSebelumnya;
+// --- KONFIGURASI PENTING ---
+// Ganti sesuai dengan "[!!!] Gateway Channel: X" di Serial Monitor Gateway
+#define WIFI_CHANNEL 6 
 
-static BLEScan* pBLEScan;
-int scanTime = 12;
+// MAC Address Gateway (TARGET)
+uint8_t gatewayAddress[] = {0x68, 0x25, 0xDD, 0x48, 0x2F, 0xD8}; 
 
-// Ganti sesuai sama MAC Address dari ESP32_Gateway
-uint8_t gatewayAddress[] = {0x68, 0x25, 0xDD, 0x48, 0x2F, 0xD8};
+#define MSG_CONFIG  1 
+#define MSG_REPORT  2
 
 typedef struct silabi_message {
-      int asset_id;
-      int status;
+    uint8_t msgType;      // 1=Config, 2=Report
+    int asset_id;         // ID Aset
+    char asset_name[30];  // Nama Aset
+    int status;           // 1=Di Tempat, 0=Hilang
 } silabi_message;
 
-silabi_message dataToSend;
+silabi_message dataMasuk;
+silabi_message dataKirim;
+
 esp_now_peer_info_t peerInfo;
 
-// --- [FIX 1] DEFINISI CALLBACK DIPINDAH KE ATAS ---
-// (Class ini harus didefinisikan SEBELUM setup() menggunakannya)
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-   void onResult(BLEAdvertisedDevice advertisedDevice) {
-      String deviceName = advertisedDevice.getName().c_str();
-      if (deviceName.startsWith("SILABI_")) {
-         for (int i = 0; i < daftarAsetMaster.size(); i++) {
-            if (deviceName == daftarAsetMaster[i]) {
-               asetDitemukan[i] = true;
-            }
-         }
-      }
-   }
+struct AsetTarget {
+  int id;
+  String nama;
+  bool ditemukan;
+  String statusTerakhir;
 };
 
-// --- [FIX 2] DEFINISI FUNGSI DIPERBARUI ---
-// Library baru (v3.3.3) mengharapkan signature ini
-void OnDataSent(const wifi_tx_info_t *tx_info, const esp_now_send_status_t status) {
-  Serial.print("\r\n[ESP-NOW] Status Pengiriman: ");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Sukses" : "Gagal");
+std::vector<AsetTarget> daftarAset;
+
+static BLEScan* pBLEScan;
+int scanTime = 5;
+
+void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingData, int len) {
+  memcpy(&dataMasuk, incomingData, sizeof(dataMasuk));
+
+  if (dataMasuk.msgType == MSG_CONFIG) {
+    String namaBaru = String(dataMasuk.asset_name);
+    int idBaru = dataMasuk.asset_id;
+
+    bool sudahAda = false;
+    for (auto &aset : daftarAset) {
+      if (aset.id == idBaru) {
+        sudahAda = true;
+        break; 
+      }
+    }
+
+    if (!sudahAda) {
+      AsetTarget asetBaru;
+      asetBaru.id = idBaru;
+      asetBaru.nama = namaBaru;
+      asetBaru.ditemukan = false;
+      asetBaru.statusTerakhir = ""; 
+      
+      daftarAset.push_back(asetBaru);
+      
+      Serial.printf("[ESP-NOW] Target Diterima: %s (ID: %d)\n", namaBaru.c_str(), idBaru);
+    }
+  }
+}
+
+class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
+    void onResult(BLEAdvertisedDevice advertisedDevice) {
+      String deviceName = advertisedDevice.getName().c_str();
+      
+      for (int i = 0; i < daftarAset.size(); i++) {
+        if (deviceName == daftarAset[i].nama) {
+          daftarAset[i].ditemukan = true; 
+          // Serial.printf("   -> Ketemu: %s\n", deviceName.c_str());
+        }
+      }
+    }
+};
+
+void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
+  // Debug
+  // Serial.print(status == ESP_NOW_SEND_SUCCESS ? "." : "!");
 }
 
 void setup() {
    Serial.begin(115200);
-   Serial.println("Memulai SILABI Scanner (Hanya BLE + ESP-NOW)...");
+   Serial.println("\n--- SILABI Scanner (Client Mode) ---");
 
    WiFi.mode(WIFI_STA);
-   Serial.printf("[Debug] Sisa Heap setelah boot: %u bytes\n", ESP.getFreeHeap());
+   
+   esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
+   Serial.printf("[Info] WiFi Channel dikunci ke: %d\n", WIFI_CHANNEL);
 
-   int channel = 11; 
-   esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-   Serial.printf("[Debug] Channel WiFi DIKUNCI ke: %d\n", channel);
-
+   // 2. Init ESP-NOW
    if (esp_now_init() != ESP_OK) {
       Serial.println("Error inisialisasi ESP-NOW");
-      return;
+      ESP.restart();
    }
-   esp_now_register_send_cb(OnDataSent); // Sekarang ini akan berhasil
+   
+   // Register Callback
+   esp_now_register_recv_cb(OnDataRecv);
+   esp_now_register_send_cb(OnDataSent);
 
    memcpy(peerInfo.peer_addr, gatewayAddress, 6);
-   peerInfo.channel = channel;
+   peerInfo.channel = WIFI_CHANNEL;
    peerInfo.encrypt = false;
+   
    if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-      Serial.println("Gagal menambahkan Peer (Gateway)");
-      return;
+      Serial.println("Gagal add peer (Mungkin sudah ada)");
    }
-   Serial.println("ESP-NOW Siap. Peer Gateway ditambahkan.");
 
-   // Aset Placeholder
-   daftarAsetMaster.push_back("SILABI_reactor");
-   asetDitemukan.resize(daftarAsetMaster.size());
-   statusAsetSebelumnya.resize(daftarAsetMaster.size(), "");
-   Serial.printf("Sinkronisasi Selesai. Aset dilacak: %d\n", daftarAsetMaster.size());
-
-   Serial.println("[Debug] Inisialisasi BLE...");
    BLEDevice::init("");
    pBLEScan = BLEDevice::getScan();
-  
-  // Baris ini sekarang akan berhasil karena class-nya sudah didefinisikan
    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-   
-  pBLEScan->setActiveScan(true);
+   pBLEScan->setActiveScan(true); 
    pBLEScan->setInterval(100);
    pBLEScan->setWindow(99);
    
-   Serial.printf("[Debug] Sisa Heap setelah BLE init: %u bytes\n", ESP.getFreeHeap());
-   Serial.println("Scanner BLE Aktif. Memulai loop...");
+   Serial.println("Scanner Siap. Menunggu Config dari Gateway...");
 }
 
-// (Class MyAdvertisedDeviceCallbacks sudah dipindah ke atas)
 
 void loop() {
-   Serial.println("\n--- Memulai Siklus Scan Baru (Scanner) ---");
-   Serial.printf("[Debug] Sisa Heap: %u bytes\n", ESP.getFreeHeap());
-
-   for (int i = 0; i < daftarAsetMaster.size(); i++) {
-      asetDitemukan[i] = false;
+   if (daftarAset.empty()) {
+      Serial.println("[Idle] Belum ada data aset. Menunggu Gateway mengirim Config...");
+      delay(3000);
+      return;
    }
 
-   Serial.println("[Debug] Memulai BLE Scan...");
+   Serial.printf("\n--- Memulai Scan (%d Aset Target) ---\n", daftarAset.size());
+
+   for (int i = 0; i < daftarAset.size(); i++) {
+      daftarAset[i].ditemukan = false;
+   }
+
    BLEScanResults* foundDevices = pBLEScan->start(scanTime, false);
-   Serial.println("[Debug] BLE Scan Selesai.");
    pBLEScan->clearResults();
 
-   String status;
-   if (asetDitemukan[0]) {
-      status = "DI TEMPAT";
-   } else {
-      status = "HILANG/PINDAH";
-   }
-   Serial.printf("Laporan Status: %s\n", status.c_str());
+   for (int i = 0; i < daftarAset.size(); i++) {
+      
+      String statusSekarang = daftarAset[i].ditemukan ? "DI TEMPAT" : "HILANG/PINDAH";
+      int statusCode = daftarAset[i].ditemukan ? 1 : 0;
 
-   // Hanya kirim kalau status berubah
-   if (status != statusAsetSebelumnya[0]) {
-      Serial.printf("[Scanner] Status berubah! Mengirim ke Gateway...\n");
-      
-      dataToSend.asset_id = 0;
-      dataToSend.status = (status == "DI TEMPAT") ? 1 : 0;
-      
-      esp_now_send(gatewayAddress, (uint8_t *) &dataToSend, sizeof(dataToSend));
-      
-      statusAsetSebelumnya[0] = status;
-   } else {
-      Serial.println("[Scanner] Status tidak berubah. Idle.");
+      // Debug
+      // Serial.printf("Aset: %s -> %s\n", daftarAset[i].nama.c_str(), statusSekarang.c_str());
+
+      // Kirim HANYA jika status berubah
+      if (statusSekarang != daftarAset[i].statusTerakhir) {
+         Serial.printf("[UPDATE] %s berubah jadi %s. Mengirim...\n", daftarAset[i].nama.c_str(), statusSekarang.c_str());
+         
+         dataKirim.msgType = MSG_REPORT;
+         dataKirim.asset_id = daftarAset[i].id;
+         dataKirim.status = statusCode;
+         
+         esp_err_t result = esp_now_send(gatewayAddress, (uint8_t *) &dataKirim, sizeof(dataKirim));
+         
+         if (result == ESP_OK) {
+            daftarAset[i].statusTerakhir = statusSekarang;
+         } else {
+            Serial.println("[Error] Gagal kirim ke Gateway");
+         }
+      }
    }
    
-   delay(10000);
+   delay(2000);
 }
