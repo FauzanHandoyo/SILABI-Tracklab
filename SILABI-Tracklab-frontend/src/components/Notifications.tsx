@@ -1,122 +1,203 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react';
+import { notificationAPI } from '../utils/api';
+import { supabase } from '../utils/supabase';
 
-type Notification = {
-    id: string
-    title: string
-    message: string
-    type: 'info' | 'warning' | 'error'
-    timestamp: string
-    isRead: boolean
+interface Notification {
+  id: number;
+  user_id: number;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
 }
 
 export default function Notifications() {
-    const [notifications, setNotifications] = useState<Notification[]>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchNotifications = async () => {
-            try {
-                const response = await fetch('/api/notifications')
-                if (!response.ok) throw new Error('Failed to fetch notifications')
-                const data = await response.json()
-                setNotifications(data)
-            } catch (err) {
-                setError('Failed to load notifications')
-                // Fallback to mock data during development
-                setNotifications(getMockNotifications())
-            } finally {
-                setLoading(false)
-            }
+  useEffect(() => {
+    loadNotifications();
+
+    // Subscribe to real-time notification updates
+    const subscription = supabase
+      .channel('notifications_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications'
+        },
+        (payload) => {
+          console.log('Notification update received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            // Add new notification to the top
+            setNotifications(prev => [payload.new as Notification, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            // Update existing notification
+            setNotifications(prev => 
+              prev.map(notif => 
+                notif.id === payload.new.id ? payload.new as Notification : notif
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            // Remove deleted notification
+            setNotifications(prev => prev.filter(notif => notif.id !== payload.old.id));
+          }
         }
+      )
+      .subscribe((status) => {
+        console.log('Notifications subscription status:', status);
+      });
 
-        fetchNotifications()
-    }, [])
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
-    const markAsRead = async (id: string) => {
-        setNotifications(prev =>
-            prev.map(n => n.id === id ? { ...n, isRead: true } : n)
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await notificationAPI.getAll();
+      setNotifications(response.data);
+    } catch (err: any) {
+      console.error('Error loading notifications:', err);
+      setError('Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await notificationAPI.markAsRead(id);
+      setNotifications(prev =>
+        prev.map(notif =>
+          notif.id === id ? { ...notif, is_read: true } : notif
         )
+      );
+    } catch (err: any) {
+      console.error('Error marking notification as read:', err);
     }
+  };
 
-    const deleteNotification = async (id: string) => {
-        setNotifications(prev => prev.filter(n => n.id !== id))
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationAPI.markAllAsRead();
+      setNotifications(prev =>
+        prev.map(notif => ({ ...notif, is_read: true }))
+      );
+    } catch (err: any) {
+      console.error('Error marking all as read:', err);
     }
+  };
 
+  const handleDelete = async (id: number) => {
+    try {
+      await notificationAPI.delete(id);
+      setNotifications(prev => prev.filter(notif => notif.id !== id));
+    } catch (err: any) {
+      console.error('Error deleting notification:', err);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric'
+    }) + ', ' + date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  if (loading) {
     return (
-        <div className="p-4">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-semibold">Notifications</h1>
-                <button 
-                    onClick={() => setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))}
-                    className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800"
-                >
-                    Mark all as read
-                </button>
-            </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
-            {error && <div className="text-red-600 mb-4">{error}</div>}
+  return (
+    <div className="p-8">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Notifications</h1>
+        {notifications.some(n => !n.is_read) && (
+          <button
+            onClick={handleMarkAllAsRead}
+            className="text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Mark all as read
+          </button>
+        )}
+      </div>
 
-            {loading ? (
-                <div className="text-center py-8">Loading...</div>
-            ) : notifications.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                    No notifications
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {notifications.map(notification => (
-                        <div 
-                            key={notification.id}
-                            className={`p-4 rounded-lg border ${
-                                notification.isRead ? 'bg-white' : 'bg-blue-50'
-                            }`}
-                        >
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h3 className="font-medium">
-                                        {notification.title}
-                                        {!notification.isRead && (
-                                            <span className="ml-2 inline-block w-2 h-2 bg-blue-600 rounded-full"/>
-                                        )}
-                                    </h3>
-                                    <p className="text-gray-600 mt-1">{notification.message}</p>
-                                    <div className="text-sm text-gray-500 mt-2">
-                                        {new Date(notification.timestamp).toLocaleString()}
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    {!notification.isRead && (
-                                        <button
-                                            onClick={() => markAsRead(notification.id)}
-                                            className="text-sm text-blue-600 hover:text-blue-800"
-                                        >
-                                            Mark as read
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => deleteNotification(notification.id)}
-                                        className="text-sm text-red-600 hover:text-red-800"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 rounded">
+          <p className="text-red-700">{error}</p>
         </div>
-    )
-}
+      )}
 
-function getMockNotifications(): Notification[] {
-    return Array.from({ length: 5 }, (_, i) => ({
-        id: `notif_${i}`,
-        title: `Test Notification ${i + 1}`,
-        message: ['Asset went missing', 'Low battery warning', 'New asset detected'][i % 3],
-        type: ['info', 'warning', 'error'][i % 3] as Notification['type'],
-        timestamp: new Date(Date.now() - i * 1000 * 60 * 30).toISOString(),
-        isRead: i % 2 === 0
-    }))
+      {/* Notifications List */}
+      <div className="space-y-4">
+        {notifications.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            No notifications
+          </div>
+        ) : (
+          notifications.map((notification) => (
+            <div
+              key={notification.id}
+              className={`bg-white rounded-lg shadow p-6 ${
+                !notification.is_read ? 'border-l-4 border-blue-600' : ''
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold">
+                      {notification.title}
+                    </h3>
+                    {!notification.is_read && (
+                      <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                    )}
+                  </div>
+                  <p className="text-gray-600 mt-2">{notification.message}</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {formatDate(notification.created_at)}
+                  </p>
+                </div>
+                <div className="flex gap-2 ml-4">
+                  {!notification.is_read && (
+                    <button
+                      onClick={() => handleMarkAsRead(notification.id)}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    >
+                      Mark as read
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(notification.id)}
+                    className="text-red-600 hover:text-red-700 text-sm font-medium"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 }

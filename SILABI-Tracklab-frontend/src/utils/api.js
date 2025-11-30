@@ -90,6 +90,13 @@ export const historyAPI = {
   create: (data) => api.post('/history', data)
 };
 
+export const notificationAPI = {
+  getAll: () => api.get('/notifications'),
+  markAsRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/read-all'),
+  delete: (id) => api.delete(`/notifications/${id}`)
+};
+
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: async (data) => {

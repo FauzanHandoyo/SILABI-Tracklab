@@ -8,6 +8,7 @@ const asetRoutes = require('./src/routes/asetInventarisRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const authRoutes = require('./src/routes/authRoutes');
 const historyRoutes = require('./src/routes/historyRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,15 +29,16 @@ app.use('/api/aset', asetRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 pool.connect()
     .then(() => {
         console.log('Connected to the database successfully.');
     })
     .catch((err) => {
-        console.error('Database connection error:', err.stack);
+        console.error('Database connection error:', err);
     });
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}`);
 });

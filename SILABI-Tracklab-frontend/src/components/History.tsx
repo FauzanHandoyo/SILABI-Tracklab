@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { historyAPI } from '../utils/api';
+import { supabase } from '../utils/supabase';
 
 interface HistoryRecord {
   id: number;
@@ -23,6 +24,40 @@ export default function History() {
 
   useEffect(() => {
     loadHistory();
+
+    // Subscribe to real-time updates
+    const subscription = supabase
+      .channel('asset_history_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'asset_history'
+        },
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            // Add new record to the top of the list
+            loadHistory(); // Reload to get full data with asset name
+          } else if (payload.eventType === 'UPDATE') {
+            // Update existing record
+            loadHistory();
+          } else if (payload.eventType === 'DELETE') {
+            // Remove deleted record
+            setHistory(prev => prev.filter(h => h.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [timeFilter]);
 
   const loadHistory = async () => {
@@ -94,16 +129,21 @@ export default function History() {
         <h1 className="text-3xl font-bold">History</h1>
         <div className="flex items-center gap-2">
           <span className="text-gray-600">Last</span>
-          <select
+          <select 
             value={timeFilter}
             onChange={(e) => setTimeFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="1">1d</option>
-            <option value="7">7d</option>
-            <option value="30">30d</option>
-            <option value="90">90d</option>
+            <option value="1">1 day</option>
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+            <option value="365">1 year</option>
           </select>
+          {/* Real-time indicator */}
+          <span className="ml-2 flex items-center gap-1 text-sm text-green-600">
+            <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+            Live
+          </span>
         </div>
       </div>
 

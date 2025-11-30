@@ -82,8 +82,6 @@ export default function EditAssetForm({ asset, onUpdated, onCancel }: Props) {
         </select>
         <input name="assigned_to" value={form.assigned_to} onChange={handleChange} placeholder="Assigned to" className="px-3 py-2 border rounded" />
         <input name="peminjam" value={form.peminjam} onChange={handleChange} placeholder="Peminjam" className="px-3 py-2 border rounded" />
-        <input name="latitude" value={form.latitude as any} onChange={handleChange} placeholder="Latitude" className="px-3 py-2 border rounded" />
-        <input name="longitude" value={form.longitude as any} onChange={handleChange} placeholder="Longitude" className="px-3 py-2 border rounded" />
         <label className="flex items-center gap-2">
           <input type="checkbox" name="status_hilang" checked={form.status_hilang} onChange={handleCheckbox} />
           <span className="text-sm">Status hilang</span>
