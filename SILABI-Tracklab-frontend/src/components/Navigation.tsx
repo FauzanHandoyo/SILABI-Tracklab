@@ -1,27 +1,38 @@
-import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import trackLabLogo from '../assets/tracklab-logo.jpg';
+import { authAPI } from '../utils/api';
+import { supabase } from '../utils/supabase';
 
-const Navigation: React.FC = () => {
-  const location = useLocation();
+const Navigation = () => {
   const navigate = useNavigate();
-  const currentPath = location.pathname;
 
-  const handleLogout = () => {
-    // Add any logout logic here (e.g., clearing localStorage, cookies, etc.)
-    localStorage.removeItem('token'); // If you're using token-based auth
-    navigate('/login'); // Redirect to login page
+  const handleLogout = async () => {
+    try {
+      // Clear JWT token
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Navigate to login
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force navigation even if there's an error
+      navigate('/login');
+    }
   };
 
   const getLinkClass = (path: string) => {
-    const isActive = currentPath === path;
-    return isActive 
-      ? "text-blue-700 font-medium hover:underline" 
-      : "text-gray-600 hover:text-blue-700 font-medium hover:underline";
+    return window.location.pathname === path
+      ? 'text-blue-600 font-semibold'
+      : 'text-gray-600 hover:text-blue-600';
   };
 
   return (
-    <nav className="flex items-center justify-between px-6 py-4 bg-white rounded-t-2xl shadow border-b">
+    <nav className="bg-white shadow-md px-6 py-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <img src={trackLabLogo} alt="TrackLab Logo" className="h-16 w-36 rounded-full object-cover" />
         <div>

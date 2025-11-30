@@ -101,38 +101,79 @@ async function updateById(id, data) {
     longitude 
   } = data;
   
+  // Build dynamic query based on provided fields
+  const updates = [];
+  const values = [];
+  let paramCount = 1;
+  
+  if (nama_aset !== undefined) {
+    updates.push(`nama_aset = $${paramCount++}`);
+    values.push(nama_aset);
+  }
+  if (category !== undefined) {
+    updates.push(`category = $${paramCount++}`);
+    values.push(category);
+  }
+  if (location !== undefined) {
+    updates.push(`location = $${paramCount++}`);
+    values.push(location);
+  }
+  if (status_aset !== undefined) {
+    updates.push(`status_aset = $${paramCount++}`);
+    values.push(status_aset);
+  }
+  if (assigned_to !== undefined) {
+    updates.push(`assigned_to = $${paramCount++}`);
+    values.push(assigned_to);
+  }
+  if (peminjam !== undefined) {
+    updates.push(`peminjam = $${paramCount++}`);
+    values.push(peminjam);
+  }
+  if (status_hilang !== undefined) {
+    updates.push(`status_hilang = $${paramCount++}`);
+    values.push(status_hilang);
+  }
+  if (latitude !== undefined) {
+    updates.push(`latitude = $${paramCount++}`);
+    values.push(latitude);
+  }
+  if (longitude !== undefined) {
+    updates.push(`longitude = $${paramCount++}`);
+    values.push(longitude);
+  }
+  
+  // Always update timestamp
+  updates.push('last_updated = CURRENT_TIMESTAMP');
+  
+  // Add ID as last parameter
+  values.push(id);
+  
+  // FIX: Check if there are any updates
+  if (updates.length === 1) { // Only timestamp
+    return await getById(id); // No fields to update, return current data
+  }
+  
   const query = `
     UPDATE aset_inventaris 
-    SET 
-      nama_aset = COALESCE($1, nama_aset),
-      category = COALESCE($2, category),
-      location = COALESCE($3, location),
-      status_aset = COALESCE($4, status_aset),
-      assigned_to = COALESCE($5, assigned_to),
-      peminjam = COALESCE($6, peminjam),
-      status_hilang = COALESCE($7, status_hilang),
-      latitude = COALESCE($8, latitude),
-      longitude = COALESCE($9, longitude),
-      last_updated = CURRENT_TIMESTAMP
-    WHERE id = $10
+    SET ${updates.join(', ')}
+    WHERE id = $${paramCount}
     RETURNING *
   `;
   
-  const values = [
-    nama_aset, 
-    category,
-    location,
-    status_aset, 
-    assigned_to,
-    peminjam, 
-    status_hilang, 
-    latitude, 
-    longitude, 
-    id
-  ];
+  console.log('Update query:', query);
+  console.log('Update values:', values);
   
+  try {
   const result = await pool.query(query, values);
+  console.log('Database UPDATE successful');
+  console.log('Rows affected:', result.rowCount); // <-- KEY LINE
+  console.log('Updated data:', result.rows[0]);
   return result.rows[0];
+} catch (error) {
+  console.error('Database update error:', error);
+  throw error;
+}
 }
 
 async function deleteById(id) {

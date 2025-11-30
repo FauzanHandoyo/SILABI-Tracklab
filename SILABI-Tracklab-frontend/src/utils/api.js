@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from './supabase';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
@@ -9,10 +10,18 @@ const api = axios.create({
 
 // Add token to every request
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // Try regular JWT first
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // If no JWT, try Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        config.headers.Authorization = `Bearer ${session.access_token}`;
+        console.log('Using Supabase token for request');
+      }
     }
     return config;
   },
@@ -24,11 +33,18 @@ api.interceptors.request.use(
 // Handle 401 errors (token expired/invalid)
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const token = localStorage.getItem('token');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Only logout if BOTH tokens are invalid
+      if (!token && !session) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        await supabase.auth.signOut();
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -84,9 +100,10 @@ export const authAPI = {
     }
     return response;
   },
-  logout: () => {
+  logout: async () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    await supabase.auth.signOut();
     window.location.href = '/login';
   },
   getCurrentUser: () => {

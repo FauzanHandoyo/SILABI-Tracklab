@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('[Hardware API] Received:', { nama, status });
+    console.log('📥 [Hardware API] Received:', { nama, status });
 
     const status_hilang = status === 'HILANG/PINDAH';
     const status_aset = status === 'DI TEMPAT' ? 'Tersedia' : 'Hilang';
@@ -33,7 +33,13 @@ export async function POST(req: NextRequest) {
       RETURNING *
     `;
     
+    console.log('🔍 Updating asset:', nama);
+    console.log('📝 New values:', { status_hilang, status_aset });
+    
     const result = await pool.query(query, [status_hilang, status_aset, nama]);
+
+    console.log('📊 Rows affected:', result.rowCount);
+    console.log('✅ Updated data:', result.rows[0]);
 
     if (result.rows.length === 0) {
       return NextResponse.json(
@@ -45,7 +51,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: 'Asset status updated',
+        message: 'Status updated successfully',
         data: result.rows[0]
       },
       {
@@ -58,9 +64,9 @@ export async function POST(req: NextRequest) {
       }
     );
   } catch (error: any) {
-    console.error('[Hardware API] Error:', error);
+    console.error('❌ [Hardware API] Database error:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error', details: error.message },
+      { success: false, error: 'Database error', details: error.message },
       { status: 500 }
     );
   }
