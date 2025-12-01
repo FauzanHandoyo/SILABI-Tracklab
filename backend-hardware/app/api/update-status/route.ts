@@ -54,14 +54,14 @@ export async function POST(req: NextRequest) {
       RETURNING *
     `;
     
-    console.log('🔍 Updating asset:', nama);
-    console.log('📝 New values:', { status_hilang, status_aset });
+    console.log('[Update] Updating asset:', nama);
+    console.log('[Update] New values:', { status_hilang, status_aset });
     
     const updateResult = await client.query(updateQuery, [status_hilang, status_aset, nama]);
     const updatedAsset = updateResult.rows[0];
 
-    console.log('📊 Rows affected:', updateResult.rowCount);
-    console.log('✅ Updated data:', updatedAsset);
+    console.log('[Update] Rows affected:', updateResult.rowCount);
+    console.log('[Update] Updated data:', updatedAsset);
 
     // 3. Create history record if status changed
     if (oldAsset.status_aset !== status_aset) {
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         rssi || null
       ]);
 
-      console.log('📝 [History] Created log:', {
+      console.log('[History] Created log:', {
         asset: updatedAsset.nama_aset,
         change: `${oldAsset.status_aset} → ${status_aset}`,
         rssi: rssi || 'N/A'
@@ -116,11 +116,11 @@ export async function POST(req: NextRequest) {
         `;
 
         await client.query(notificationQuery, [
-          '⚠️ Asset Missing',
+          'Asset Missing',
           `Asset "${updatedAsset.nama_aset}" (${updatedAsset.kode_aset}) is now missing!`
         ]);
 
-        console.log('🔔 [Notification] Created missing asset alert');
+        console.log('[Notification] Created missing asset alert');
       }
 
       // 5. Create notification if asset returned
@@ -150,10 +150,10 @@ export async function POST(req: NextRequest) {
           `Asset "${updatedAsset.nama_aset}" (${updatedAsset.kode_aset}) has been found!`
         ]);
 
-        console.log('🔔 [Notification] Created asset found alert');
+        console.log('[Notification] Created asset found alert');
       }
     } else {
-      console.log('ℹ️ [History] No status change, skipping log');
+      console.log('[History] No status change, skipping log');
     }
 
     // Commit transaction
