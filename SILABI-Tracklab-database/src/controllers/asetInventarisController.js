@@ -69,7 +69,7 @@ async function updateAset(req, res) {
     }
 
     const oldAsset = oldAssetResult.rows[0];
-    console.log('📋 Old asset data:', oldAsset);
+    console.log('[Database] Old asset data:', oldAsset);
 
     // 2. Determine what changed BEFORE updating
     const changes = [];
@@ -81,7 +81,7 @@ async function updateAset(req, res) {
         old_status: oldAsset.status_aset,
         new_status: updateData.status_aset
       });
-      console.log(`🔄 Status change detected: ${oldAsset.status_aset} → ${updateData.status_aset}`);
+      console.log(`[History] Status change detected: ${oldAsset.status_aset} → ${updateData.status_aset}`);
     }
 
     // Check location change
@@ -91,7 +91,7 @@ async function updateAset(req, res) {
         old_location: oldAsset.location,
         new_location: updateData.location
       });
-      console.log(`📍 Location change detected: ${oldAsset.location} → ${updateData.location}`);
+      console.log(`[History] Location change detected: ${oldAsset.location} → ${updateData.location}`);
     }
 
     // Check category change
@@ -101,7 +101,7 @@ async function updateAset(req, res) {
         old_value: oldAsset.category,
         new_value: updateData.category
       });
-      console.log(`📂 Category change detected: ${oldAsset.category} → ${updateData.category}`);
+      console.log(`[History] Category change detected: ${oldAsset.category} → ${updateData.category}`);
     }
 
     // Check assigned_to change
@@ -111,7 +111,7 @@ async function updateAset(req, res) {
         old_value: oldAsset.assigned_to,
         new_value: updateData.assigned_to
       });
-      console.log(`👤 Assignment change detected: ${oldAsset.assigned_to} → ${updateData.assigned_to}`);
+      console.log(`[History] Assignment change detected: ${oldAsset.assigned_to} → ${updateData.assigned_to}`);
     }
 
     // 3. Build dynamic update query
@@ -138,19 +138,19 @@ async function updateAset(req, res) {
       RETURNING *
     `;
 
-    console.log('🔍 Updating asset:', id);
-    console.log('📝 New values:', updateData);
+    console.log('[Database] Updating asset:', id);
+    console.log('[Database] New values:', updateData);
 
     const updateResult = await client.query(updateQuery, values);
     const updatedAsset = updateResult.rows[0];
 
-    console.log('✅ Database UPDATE successful');
-    console.log('📊 Rows affected:', updateResult.rowCount);
-    console.log('✅ Updated data:', updatedAsset);
+    console.log('[Database] UPDATE successful');
+    console.log('[Database] Rows affected:', updateResult.rowCount);
+    console.log('[Database] Updated data:', updatedAsset);
 
     // 4. Create history records for each change
     if (changes.length > 0) {
-      console.log(`📝 Creating ${changes.length} history record(s)...`);
+      console.log(`[History] Creating ${changes.length} history record(s)...`);
       
       for (const change of changes) {
         const historyQuery = `
@@ -177,7 +177,7 @@ async function updateAset(req, res) {
           null // No RSSI for manual updates
         ]);
 
-        console.log('✅ [History] Created log:', historyResult.rows[0]);
+        console.log('[History] Created log:', historyResult.rows[0]);
         console.log('   Asset:', updatedAsset.nama_aset);
         console.log('   Type:', change.type);
         console.log('   Change:', `${change.old_status || change.old_value || 'N/A'} → ${change.new_status || change.new_value || 'N/A'}`);
@@ -193,19 +193,19 @@ async function updateAset(req, res) {
           let notifType = 'info';
 
           if (statusChange.new_status === 'Hilang') {
-            notifTitle = '⚠️ Asset Status Changed';
+            notifTitle = 'Asset Status Changed';
             notifMessage = `Asset "${updatedAsset.nama_aset}" status changed to Missing`;
             notifType = 'warning';
           } else if (statusChange.new_status === 'Tersedia' && statusChange.old_status === 'Hilang') {
-            notifTitle = '✅ Asset Status Changed';
+            notifTitle = 'Asset Status Changed';
             notifMessage = `Asset "${updatedAsset.nama_aset}" is now Available`;
             notifType = 'success';
           } else if (statusChange.new_status === 'Dalam Perbaikan') {
-            notifTitle = '🔧 Asset Under Maintenance';
+            notifTitle = 'Asset Under Maintenance';
             notifMessage = `Asset "${updatedAsset.nama_aset}" is now under maintenance`;
             notifType = 'warning';
           } else if (statusChange.new_status === 'Dipinjam') {
-            notifTitle = '📤 Asset Borrowed';
+            notifTitle = 'Asset Borrowed';
             notifMessage = `Asset "${updatedAsset.nama_aset}" has been borrowed`;
             notifType = 'info';
           } else {
@@ -231,17 +231,17 @@ async function updateAset(req, res) {
               false,
               NOW()
             FROM users u
-            WHERE u.role IN ('admin', 'staff')
+            WHERE u.role IN ('admin', 'staff', 'technician')
           `;
 
           await client.query(notificationQuery, [notifTitle, notifMessage, notifType]);
-          console.log('🔔 [Notification] Created status change alert');
+          console.log('[Notification] Created status change alert');
         } catch (notifError) {
-          console.log('⚠️ [Notification] Skipped:', notifError.message);
+          console.log('[Notification] Skipped:', notifError.message);
         }
       }
     } else {
-      console.log('ℹ️ [History] No significant changes detected');
+      console.log('[History] No significant changes detected');
     }
 
     // Commit transaction
@@ -250,8 +250,8 @@ async function updateAset(req, res) {
     res.json(updatedAsset);
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('❌ Error updating asset:', err);
-    console.error('Error details:', err.message);
+    console.error('[Error] Error updating asset:', err);
+    console.error('[Error] Error details:', err.message);
     res.status(500).json({ error: 'Failed to update asset', details: err.message });
   } finally {
     client.release();

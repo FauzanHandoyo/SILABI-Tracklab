@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
             false,
             NOW()
           FROM users u
-          WHERE u.role IN ('admin', 'staff')
+          WHERE u.role IN ('admin', 'staff', 'technician')
         `;
 
         await client.query(notificationQuery, [
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
             false,
             NOW()
           FROM users u
-          WHERE u.role IN ('admin', 'staff')
+          WHERE u.role IN ('admin', 'staff', 'technician')
         `;
 
         await client.query(notificationQuery, [
