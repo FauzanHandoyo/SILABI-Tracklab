@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json();
-    const { nama, status, rssi } = body; // Added rssi field
+    const { nama, status, rssi } = body;
 
     if (!nama || !status) {
       return NextResponse.json(
@@ -20,7 +20,57 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('📥 [Hardware API] Received:', { nama, status, rssi });
+    console.log('[Hardware API] Received:', { nama, status, rssi });
+
+    // Check if this is a Gateway boot message
+    const isGatewayBoot = nama === 'SILABI_GATEWAY_BOOT';
+
+    if (isGatewayBoot) {
+      console.log('[Gateway] Gateway connected!');
+      
+      // Create notification for Gateway connection
+      const notificationQuery = `
+        INSERT INTO notifications (
+          user_id,
+          title,
+          message,
+          type,
+          is_read,
+          created_at
+        )
+        SELECT 
+          u.id,
+          $1,
+          $2,
+          'success',
+          false,
+          NOW()
+        FROM users u
+        WHERE u.role IN ('admin', 'staff', 'technician')
+      `;
+
+      await client.query(notificationQuery, [
+        'Gateway Connected',
+        `ESP32 Gateway is now online and monitoring assets`
+      ]);
+
+      console.log('[Notification] Gateway connection alert created');
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Gateway boot registered'
+        },
+        {
+          status: 200,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          }
+        }
+      );
+    }
 
     const status_hilang = status === 'HILANG/PINDAH';
     const status_aset = status === 'DI TEMPAT' ? 'Tersedia' : 'Hilang';
@@ -41,7 +91,7 @@ export async function POST(req: NextRequest) {
     }
 
     const oldAsset = oldAssetResult.rows[0];
-    console.log('📋 Old asset status:', oldAsset.status_aset);
+    console.log('[Update] Old asset status:', oldAsset.status_aset);
 
     // 2. Update asset
     const updateQuery = `
@@ -63,24 +113,22 @@ export async function POST(req: NextRequest) {
     console.log('[Update] Rows affected:', updateResult.rowCount);
     console.log('[Update] Updated data:', updatedAsset);
 
-    // 3. Create history record if status changed
+    // 3. Create history record if status changed (FIXED - removed nama_aset)
     if (oldAsset.status_aset !== status_aset) {
       const historyQuery = `
         INSERT INTO asset_history (
           asset_id,
-          nama_aset,
           event_type,
           old_status,
           new_status,
           rssi,
           timestamp
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, NOW())
         RETURNING *
       `;
 
       const historyResult = await client.query(historyQuery, [
         updatedAsset.id,
-        updatedAsset.nama_aset,
         'hardware_scan',
         oldAsset.status_aset,
         status_aset,
@@ -88,6 +136,7 @@ export async function POST(req: NextRequest) {
       ]);
 
       console.log('[History] Created log:', {
+        id: historyResult.rows[0].id,
         asset: updatedAsset.nama_aset,
         change: `${oldAsset.status_aset} → ${status_aset}`,
         rssi: rssi || 'N/A'
@@ -117,7 +166,7 @@ export async function POST(req: NextRequest) {
 
         await client.query(notificationQuery, [
           'Asset Missing',
-          `Asset "${updatedAsset.nama_aset}" (${updatedAsset.kode_aset}) is now missing!`
+          `Asset "${updatedAsset.nama_aset}" is now missing! Last seen: ${new Date().toLocaleString()}`
         ]);
 
         console.log('[Notification] Created missing asset alert');
@@ -146,14 +195,14 @@ export async function POST(req: NextRequest) {
         `;
 
         await client.query(notificationQuery, [
-          '✅ Asset Found',
-          `Asset "${updatedAsset.nama_aset}" (${updatedAsset.kode_aset}) has been found!`
+          'Asset Found',
+          `Asset "${updatedAsset.nama_aset}" has been found and is back in place!`
         ]);
 
         console.log('[Notification] Created asset found alert');
       }
     } else {
-      console.log('[History] No status change, skipping log');
+      console.log('ℹ[History] No status change, skipping log');
     }
 
     // Commit transaction
@@ -176,7 +225,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     await client.query('ROLLBACK');
-    console.error('❌ [Hardware API] Database error:', error);
+    console.error('[Hardware API] Database error:', error);
     return NextResponse.json(
       { success: false, error: 'Database error', details: error.message },
       { status: 500 }
