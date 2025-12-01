@@ -7,7 +7,7 @@
 
 // --- KONFIGURASI PENTING ---
 // Ganti sesuai dengan "[!!!] Gateway Channel: X" di Serial Monitor Gateway
-#define WIFI_CHANNEL 6 
+#define WIFI_CHANNEL 11 
 
 // MAC Address Gateway (TARGET)
 uint8_t gatewayAddress[] = {0x68, 0x25, 0xDD, 0x48, 0x2F, 0xD8}; 
@@ -19,7 +19,7 @@ typedef struct silabi_message {
     uint8_t msgType;      // 1=Config, 2=Report
     int asset_id;         // ID Aset
     char asset_name[30];  // Nama Aset
-    int status;           // 1=Di Tempat, 0=Hilang
+    int status;           // 1=Tersedia, 0=Hilang
 } silabi_message;
 
 silabi_message dataMasuk;
@@ -142,7 +142,7 @@ void loop() {
 
    for (int i = 0; i < daftarAset.size(); i++) {
       
-      String statusSekarang = daftarAset[i].ditemukan ? "DI TEMPAT" : "HILANG/PINDAH";
+      String statusSekarang = daftarAset[i].ditemukan ? "Tersedia" : "HILANG";
       int statusCode = daftarAset[i].ditemukan ? 1 : 0;
 
       // Debug
