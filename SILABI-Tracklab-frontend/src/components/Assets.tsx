@@ -1,7 +1,9 @@
+// ...existing code...
 import React, { useEffect, useState } from 'react'
 import { assetAPI } from '../utils/api'
 import AddAssetForm from './AddAssetForm'
 import EditAssetForm from './EditAssetForm'
+import { supabase } from '../utils/supabase'
 
 type Asset = {
     id: string
@@ -21,6 +23,42 @@ export default function Assets() {
     const [search, setSearch] = useState('')
     const [showForm, setShowForm] = useState(false)
     const [editingAsset, setEditingAsset] = useState<any | null>(null)
+    const [role, setRole] = useState<string | null>(null)
+    const [roleLoaded, setRoleLoaded] = useState(false)
+
+    useEffect(() => {
+        const stored = localStorage.getItem('user')
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored)
+                if (parsed?.role) {
+                    setRole(parsed.role)
+                }
+            } catch {
+                // ignore
+            }
+        }
+        supabase.auth.getUser()
+          .then(({ data: { user } }) => {
+            if (user) {
+              const r =
+                (user.user_metadata as any)?.role ||
+                (user.app_metadata as any)?.role ||
+                null
+              if (r) {
+                setRole(r)
+                const existing = stored ? JSON.parse(stored || '{}') : {}
+                localStorage.setItem('user', JSON.stringify({ ...existing, role: r }))
+              }
+            }
+          })
+          .catch(() => {
+            // ignore
+          })
+          .finally(() => {
+            setRoleLoaded(true)
+          })
+    }, [])
 
     useEffect(() => {
         const fetchAssets = async () => {
@@ -86,6 +124,11 @@ export default function Assets() {
     }
 
     const handleEditClick = (a: any) => {
+        if (role === 'user') {
+            setError('Permission denied')
+            return
+        }
+
         // convert frontend asset back to backend-ish shape for form
         setEditingAsset({
             id: a.rawId,
@@ -118,6 +161,11 @@ export default function Assets() {
     }
 
     const handleDelete = async (a: any) => {
+        if (role === 'user') {
+            setError('Permission denied')
+            return
+        }
+
         console.log('Delete called with asset:', a);
         console.log('rawId:', a.rawId);
         
@@ -145,9 +193,11 @@ export default function Assets() {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Assets</h1>
                 <div className="flex items-center gap-2">
-                  <button onClick={handleAddClick} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                      Add Asset
-                  </button>
+                  {(role == 'admin' || role == 'technician') && (
+                    <button onClick={handleAddClick} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Add Asset
+                    </button>
+                  )}
                 </div>
             </div>
 
@@ -197,8 +247,17 @@ export default function Assets() {
                                       {asset.status}
                                   </span>
                                   <div className="flex gap-2">
-                                    <button onClick={() => handleEditClick(asset)} className="px-2 py-1 text-sm bg-yellow-100 rounded hover:bg-yellow-200">Edit</button>
-                                    <button onClick={() => handleDelete(asset)} className="px-2 py-1 text-sm bg-red-100 rounded hover:bg-red-200">Delete</button>
+                                    {/* hide edit/delete for plain "user" role */}
+                                    {(role == 'admin' || role == 'technician')&& (
+                                      <>
+                                        <button onClick={() => handleEditClick(asset)} className="px-2 py-1 text-sm bg-yellow-100 rounded hover:bg-yellow-200">Edit</button>
+                                        <button onClick={() => handleDelete(asset)} className="px-2 py-1 text-sm bg-red-100 rounded hover:bg-red-200">Delete</button>
+                                      </>
+                                        )}
+                                    {role == 'user' && (
+                                        <>
+                                            <button onClick={() => alert('Belum implementasi fitur permintaan pinjam')} className="px-2 py-1 text-sm bg-blue-100 rounded hover:bg-blue-200">Request to Borrow</button>
+                                        </>)}
                                   </div>
                                 </div>
                             </div>
@@ -214,3 +273,4 @@ export default function Assets() {
         </div>
     )
 }
+// ...existing code...
