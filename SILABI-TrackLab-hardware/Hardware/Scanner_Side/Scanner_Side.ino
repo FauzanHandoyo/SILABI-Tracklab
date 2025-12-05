@@ -7,12 +7,11 @@
 
 // --- KONFIGURASI PENTING ---
 // Ganti sesuai dengan "[!!!] Gateway Channel: X" di Serial Monitor Gateway
-#define WIFI_CHANNEL 11 
+#define WIFI_CHANNEL 5
 
 // MAC Address Gateway (TARGET)
-uint8_t gatewayAddress[] = {0x68, 0x25, 0xDD, 0x48, 0x2F, 0xD8}; 
-
-#define MSG_CONFIG  1 
+uint8_t gatewayAddress[] = {0x68, 0x25, 0xDD, 0x48, 0x2F, 0xD8};
+#define MSG_CONFIG  1
 #define MSG_REPORT  2
 
 typedef struct silabi_message {
@@ -20,6 +19,7 @@ typedef struct silabi_message {
     int asset_id;         // ID Aset
     char asset_name[30];  // Nama Aset
     int status;           // 1=Tersedia, 0=Hilang
+    int rssi;
 } silabi_message;
 
 silabi_message dataMasuk;
@@ -31,13 +31,13 @@ struct AsetTarget {
   int id;
   String nama;
   bool ditemukan;
+  int rssi;
   String statusTerakhir;
 };
 
 std::vector<AsetTarget> daftarAset;
-
 static BLEScan* pBLEScan;
-int scanTime = 5;
+int scanTime = 8;
 
 void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingData, int len) {
   memcpy(&dataMasuk, incomingData, sizeof(dataMasuk));
@@ -50,7 +50,7 @@ void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingDa
     for (auto &aset : daftarAset) {
       if (aset.id == idBaru) {
         sudahAda = true;
-        break; 
+        break;
       }
     }
 
@@ -59,10 +59,11 @@ void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingDa
       asetBaru.id = idBaru;
       asetBaru.nama = namaBaru;
       asetBaru.ditemukan = false;
-      asetBaru.statusTerakhir = ""; 
-      
+      asetBaru.rssi = 0;
+      asetBaru.statusTerakhir = "";
+ 
       daftarAset.push_back(asetBaru);
-      
+    
       Serial.printf("[ESP-NOW] Target Diterima: %s (ID: %d)\n", namaBaru.c_str(), idBaru);
     }
   }
@@ -71,10 +72,11 @@ void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingDa
 class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) {
       String deviceName = advertisedDevice.getName().c_str();
-      
+     
       for (int i = 0; i < daftarAset.size(); i++) {
         if (deviceName == daftarAset[i].nama) {
-          daftarAset[i].ditemukan = true; 
+          daftarAset[i].ditemukan = true;
+          daftarAset[i].rssi = advertisedDevice.getRSSI();
           // Serial.printf("   -> Ketemu: %s\n", deviceName.c_str());
         }
       }
@@ -116,7 +118,7 @@ void setup() {
    BLEDevice::init("");
    pBLEScan = BLEDevice::getScan();
    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-   pBLEScan->setActiveScan(true); 
+   pBLEScan->setActiveScan(true);
    pBLEScan->setInterval(100);
    pBLEScan->setWindow(99);
    
@@ -135,26 +137,27 @@ void loop() {
 
    for (int i = 0; i < daftarAset.size(); i++) {
       daftarAset[i].ditemukan = false;
+      daftarAset[i].rssi = 0;
    }
 
    BLEScanResults* foundDevices = pBLEScan->start(scanTime, false);
    pBLEScan->clearResults();
 
-   for (int i = 0; i < daftarAset.size(); i++) {
-      
-      String statusSekarang = daftarAset[i].ditemukan ? "Tersedia" : "HILANG";
+   for (int i = 0; i < daftarAset.size(); i++) {    
+      String statusSekarang = daftarAset[i].ditemukan ? "DI TEMPAT" : "HILANG";
       int statusCode = daftarAset[i].ditemukan ? 1 : 0;
-
+      int rssiValue = daftarAset[i].rssi;
       // Debug
-      // Serial.printf("Aset: %s -> %s\n", daftarAset[i].nama.c_str(), statusSekarang.c_str());
+      // Serial.printf("Aset: %s -> %s (RSSI: %d)\n", daftarAset[i].nama.c_str(), statusSekarang.c_str());
 
       // Kirim HANYA jika status berubah
       if (statusSekarang != daftarAset[i].statusTerakhir) {
-         Serial.printf("[UPDATE] %s berubah jadi %s. Mengirim...\n", daftarAset[i].nama.c_str(), statusSekarang.c_str());
+         Serial.printf("[UPDATE] %s -> %s (RSSI: %d). Mengirim...\n", daftarAset[i].nama.c_str(), statusSekarang.c_str(), rssiValue);
          
          dataKirim.msgType = MSG_REPORT;
          dataKirim.asset_id = daftarAset[i].id;
          dataKirim.status = statusCode;
+         dataKirim.rssi = rssiValue;
          
          esp_err_t result = esp_now_send(gatewayAddress, (uint8_t *) &dataKirim, sizeof(dataKirim));
          

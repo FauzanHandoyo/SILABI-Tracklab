@@ -27,6 +27,7 @@ String statusTerakhir = "";
 struct PesanAntrian {
   String nama;
   String status;
+  int rssi;
 };
 
 std::vector<PesanAntrian> antrianPengiriman;
@@ -37,6 +38,7 @@ typedef struct silabi_message {
     int asset_id;         // ID Aset
     char asset_name[30];  // Nama Aset
     int status;           // 1=Di Tempat, 0=Hilang
+    int rssi;
 } silabi_message;
 
 silabi_message dataDiterima;
@@ -61,6 +63,7 @@ void broadcastAssetList() {
   silabi_message msg;
   msg.msgType = MSG_CONFIG; 
   msg.status = 0; 
+  msg.rssi = 0;
 
   esp_now_peer_info_t peerInfo;
   
@@ -127,14 +130,16 @@ void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingDa
         namaAset = "ASET_TIDAK_DIKENAL"; 
       }
 
-      String statusSekarang = (dataDiterima.status == 1) ? "Tersedia" : "HILANG";
+      String statusSekarang = (dataDiterima.status == 1) ? "DI TEMPAT" : "HILANG";
+      int rssiSekarang = dataDiterima.rssi;
       
-      Serial.printf("\n[ESP-NOW] Masuk ID %d: %s -> %s\n", id, namaAset.c_str(), statusSekarang.c_str());
+      Serial.printf("\n[ESP-NOW] Masuk ID %d: %s -> %s (RSSI: %d)\n", id, namaAset.c_str(), statusSekarang.c_str(), rssiSekarang);
 
       // Logika Antrian
       PesanAntrian pesanBaru;
       pesanBaru.nama = namaAset;
       pesanBaru.status = statusSekarang;
+      pesanBaru.rssi = rssiSekarang;
   
       antrianPengiriman.push_back(pesanBaru); // Masukkan ke belakang antrian
   
@@ -258,7 +263,7 @@ void setup() {
 
   Serial.println("\n[Test] Kirim status BOOT ke Vercel...");
   // Gunakan "DI TEMPAT" agar DB mencatat "Tersedia"
-  kirimKeCloud("SILABI_GATEWAY_BOOT", "DI TEMPAT"); 
+  kirimKeCloud("SILABI_GATEWAY_BOOT", "DI TEMPAT", -69420); 
   
   Serial.println("\n>>> GATEWAY SIAP MENERIMA DATA <<<");
 }
@@ -273,7 +278,7 @@ void loop() {
     Serial.printf("[Loop] Memproses antrian: %s -> %s\n", pesan.nama.c_str(), pesan.status.c_str());
     
     // Kirim ke Cloud
-    kirimKeCloud(pesan.nama, pesan.status);
+    kirimKeCloud(pesan.nama, pesan.status, pesan.rssi);
     
     // Hapus pesan dari antrian setelah dikirim
     antrianPengiriman.erase(antrianPengiriman.begin());
@@ -302,7 +307,7 @@ void setupWiFi() {
   Serial.println(WiFi.localIP());
 }
 
-void kirimKeCloud(String namaAset, String status) {
+void kirimKeCloud(String namaAset, String status, int rssi) {
   
   WiFiClientSecure client_secure; 
   HTTPClient http;
@@ -313,6 +318,7 @@ void kirimKeCloud(String namaAset, String status) {
   JsonDocument doc;
   doc["nama"] = namaAset;
   doc["status"] = status;
+  doc["rssi"] = rssi;
   String jsonPayload;
   serializeJson(doc, jsonPayload);
 
