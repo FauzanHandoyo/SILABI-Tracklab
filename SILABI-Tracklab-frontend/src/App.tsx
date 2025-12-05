@@ -106,14 +106,15 @@ function App() {
   const hideNavPaths = ['/login', '/register'];
   const showNavigation = !hideNavPaths.includes(location.pathname);
 
-  useEffect(() => {
+useEffect(() => {
   const hash = window.location.hash;
-  
+  const token = authAPI.getToken();
+
+  // If URL hash contains access token, wait for Supabase to process it
   if (hash && hash.includes('access_token')) {
     console.log('⏳ Waiting for Supabase to process URL hash...');
     setIsProcessingAuth(true);
-    
-    // Wait a bit for Supabase to process the hash
+
     const timer = setTimeout(() => {
       supabase.auth.getSession().then(({ data: { session } }) => {
         console.log('✅ Session after waiting:', !!session);
@@ -123,10 +124,18 @@ function App() {
         }
         setIsProcessingAuth(false);
       });
-    }, 1000); // Give Supabase 1 second to process
-    
+    }, 1000);
+
     return () => clearTimeout(timer);
   }
+
+  // Immediately check current auth state and redirect if needed
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    console.log('App - Initial session check:', !!session, 'Token:', !!token);
+    if (!session && !token && !hideNavPaths.includes(location.pathname)) {
+      navigate('/login', { replace: true });
+    }
+  });
 
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     console.log('App - Auth event:', event, 'Has session:', !!session);
@@ -144,7 +153,7 @@ function App() {
   });
 
   return () => subscription.unsubscribe();
-}, [navigate]);
+}, [navigate, location.pathname]);
 
   if (isProcessingAuth) {
     return (
