@@ -80,9 +80,31 @@ function validateAsset(req, res, next) {
   next();
 }
 
+validateRequest = (req, res, next) => {
+  const {
+    asset_id,
+    user_id,
+    request_type,
+    status,
+    request_date
+  } = req.body;
+  
+  if (!asset_id || !user_id || !request_type || !status || !request_date) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const validRequestTypes = ['borrow', 'return'];
+  if (!validRequestTypes.includes(request_type)) {
+    return res.status(400).json({ error: 'Invalid request type' });
+  }
+
+  next();
+};
+
 module.exports = { 
   validateRegistration, 
   validateLogin, 
   validateUser, 
-  validateAsset 
+  validateAsset,
+  validateRequest
 };

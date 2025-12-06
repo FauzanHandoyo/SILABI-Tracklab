@@ -5,6 +5,7 @@ dotenv.config();
 
 const pool = require('./db');
 const asetRoutes = require('./src/routes/asetInventarisRoutes');
+const asetRequestRoutes = require('./src/routes/asetRequestRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const authRoutes = require('./src/routes/authRoutes');
 const historyRoutes = require('./src/routes/historyRoutes');
@@ -26,6 +27,7 @@ app.get('/', async (req, res) => {
 });
 
 app.use('/api/aset', asetRoutes);
+app.use('/api/requests', asetRequestRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/history', historyRoutes);
