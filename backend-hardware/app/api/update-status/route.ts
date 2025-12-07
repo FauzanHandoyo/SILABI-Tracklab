@@ -22,13 +22,16 @@ export async function POST(req: NextRequest) {
 
     console.log('[Hardware API] Received:', { nama, status, rssi });
 
+    // Format RSSI as location string
+    const rssiLocation = rssi ? `${rssi} dBm` : 'Unknown';
+    console.log('[Location] RSSI:', rssiLocation);
+
     // Check if this is a Gateway boot message
     const isGatewayBoot = nama === 'SILABI_GATEWAY_BOOT';
 
     if (isGatewayBoot) {
-      console.log('[Gateway] Gateway connected!');
+      console.log('[Gateway] Gateway connected');
       
-      // Create notification for Gateway connection
       const notificationQuery = `
         INSERT INTO notifications (
           user_id,
@@ -57,10 +60,7 @@ export async function POST(req: NextRequest) {
       console.log('[Notification] Gateway connection alert created');
 
       return NextResponse.json(
-        {
-          success: true,
-          message: 'Gateway boot registered'
-        },
+        { success: true, message: 'Gateway boot registered' },
         {
           status: 200,
           headers: {
@@ -75,10 +75,9 @@ export async function POST(req: NextRequest) {
     const status_hilang = status === 'HILANG/PINDAH';
     const status_aset = status === 'DI TEMPAT' ? 'Tersedia' : 'Hilang';
 
-    // Start transaction
     await client.query('BEGIN');
 
-    // 1. Get old asset data first
+    // Get old asset data
     const getAssetQuery = 'SELECT * FROM aset_inventaris WHERE nama_aset = $1';
     const oldAssetResult = await client.query(getAssetQuery, [nama]);
 
@@ -91,39 +90,45 @@ export async function POST(req: NextRequest) {
     }
 
     const oldAsset = oldAssetResult.rows[0];
-    console.log('[Update] Old asset status:', oldAsset.status_aset);
+    console.log('[Update] Old:', { status: oldAsset.status_aset, location: oldAsset.location });
 
-    // 2. Update asset
+    // Update asset with raw RSSI as location
     const updateQuery = `
       UPDATE aset_inventaris 
       SET 
         status_hilang = $1,
         status_aset = $2,
+        location = $3,
         last_updated = CURRENT_TIMESTAMP
-      WHERE nama_aset = $3
+      WHERE nama_aset = $4
       RETURNING *
     `;
     
-    console.log('[Update] Updating asset:', nama);
-    console.log('[Update] New values:', { status_hilang, status_aset });
+    console.log('[Update] New:', { status: status_aset, location: rssiLocation });
     
-    const updateResult = await client.query(updateQuery, [status_hilang, status_aset, nama]);
+    const updateResult = await client.query(updateQuery, [
+      status_hilang, 
+      status_aset, 
+      rssiLocation,
+      nama
+    ]);
     const updatedAsset = updateResult.rows[0];
 
-    console.log('[Update] Rows affected:', updateResult.rowCount);
-    console.log('[Update] Updated data:', updatedAsset);
+    console.log('[Update] Success:', updateResult.rowCount, 'rows');
 
-    // 3. Create history record if status changed (FIXED - removed nama_aset)
-    if (oldAsset.status_aset !== status_aset) {
+    // Create history record if status or location changed
+    if (oldAsset.status_aset !== status_aset || oldAsset.location !== rssiLocation) {
       const historyQuery = `
         INSERT INTO asset_history (
           asset_id,
           event_type,
           old_status,
           new_status,
+          old_location,
+          new_location,
           rssi,
           timestamp
-        ) VALUES ($1, $2, $3, $4, $5, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
         RETURNING *
       `;
 
@@ -132,17 +137,19 @@ export async function POST(req: NextRequest) {
         'hardware_scan',
         oldAsset.status_aset,
         status_aset,
+        oldAsset.location,
+        rssiLocation,
         rssi || null
       ]);
 
-      console.log('[History] Created log:', {
+      console.log('[History] Created:', {
         id: historyResult.rows[0].id,
         asset: updatedAsset.nama_aset,
-        change: `${oldAsset.status_aset} → ${status_aset}`,
-        rssi: rssi || 'N/A'
+        status_change: `${oldAsset.status_aset} -> ${status_aset}`,
+        rssi_change: `${oldAsset.location || 'Unknown'} -> ${rssiLocation}`
       });
 
-      // 4. Create notification if asset went missing
+      // Notification if asset went missing
       if (status_aset === 'Hilang' && oldAsset.status_aset !== 'Hilang') {
         const notificationQuery = `
           INSERT INTO notifications (
@@ -166,13 +173,13 @@ export async function POST(req: NextRequest) {
 
         await client.query(notificationQuery, [
           'Asset Missing',
-          `Asset "${updatedAsset.nama_aset}" is now missing! Last seen: ${new Date().toLocaleString()}`
+          `Asset "${updatedAsset.nama_aset}" is missing. Last signal: ${rssiLocation}`
         ]);
 
-        console.log('[Notification] Created missing asset alert');
+        console.log('[Notification] Missing asset alert created');
       }
 
-      // 5. Create notification if asset returned
+      // Notification if asset found
       if (status_aset === 'Tersedia' && oldAsset.status_aset === 'Hilang') {
         const notificationQuery = `
           INSERT INTO notifications (
@@ -196,16 +203,15 @@ export async function POST(req: NextRequest) {
 
         await client.query(notificationQuery, [
           'Asset Found',
-          `Asset "${updatedAsset.nama_aset}" has been found and is back in place!`
+          `Asset "${updatedAsset.nama_aset}" found. Signal strength: ${rssiLocation}`
         ]);
 
-        console.log('[Notification] Created asset found alert');
+        console.log('[Notification] Asset found alert created');
       }
     } else {
-      console.log('ℹ[History] No status change, skipping log');
+      console.log('[History] No changes detected');
     }
 
-    // Commit transaction
     await client.query('COMMIT');
 
     return NextResponse.json(
@@ -225,7 +231,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     await client.query('ROLLBACK');
-    console.error('[Hardware API] Database error:', error);
+    console.error('[Hardware API] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Database error', details: error.message },
       { status: 500 }
