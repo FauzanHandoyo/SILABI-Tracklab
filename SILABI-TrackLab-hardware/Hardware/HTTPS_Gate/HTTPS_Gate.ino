@@ -11,7 +11,7 @@ const char* ssid = "Drowsy";
 const char* password = "sleepyhead";
 
 // --- ENDPOINT VERCEL ---
-const char* apiHost = "https://backend-hardware-p8o9odj2v-fauzanhandoyos-projects.vercel.app"; 
+const char* apiHost = "https://backend-hardware-mzpxid42t-fauzanhandoyos-projects.vercel.app"; 
 
 
 #define MSG_CONFIG  1

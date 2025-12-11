@@ -76,6 +76,18 @@ export const assetAPI = {
   getStats: () => api.get('/aset/stats')
 };
 
+export const requestAPI = {
+  getAll: () => api.get('/requests'),
+  getById: (id) => api.get(`/requests/${id}`),
+  create: (data) => api.post('/requests', data),
+  update: (id, data) => api.put(`/requests/${id}`, data),
+  delete: (id) => api.delete(`/requests/${id}`),
+
+  createRequest: (data) => api.post('/requests', data),
+  approveRequest: (id) => api.put(`/requests/${id}/approve`),
+  denyRequest: (id) => api.put(`/requests/${id}/deny`)
+};
+
 export const historyAPI = {
   getAll: (filters = {}) => {
     const params = new URLSearchParams();

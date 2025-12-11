@@ -79,6 +79,7 @@ const Navigation = () => {
     { to: '/profile', label: 'Profile' },
     { to: '/', label: 'Dashboard' },
     { to: '/assets', label: 'Assets' },
+    { to: '/requests', label: 'Requests' },
     { to: '/history', label: 'History' },
     { to: '/notifications', label: 'Notifications' },
     // add admin-only routes here, e.g. { to: '/manage-users', label: 'Manage Users' }

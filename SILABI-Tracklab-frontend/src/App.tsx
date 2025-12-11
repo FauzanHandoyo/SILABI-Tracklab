@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import Assets from './pages/Assets';
+import AssetRequests from './pages/AssetRequests';
 import History from './pages/History';
 import Notifications from './pages/Notifications';
 import { authAPI } from './utils/api';
@@ -208,6 +209,14 @@ useEffect(() => {
             element={
               <ProtectedRoute>
                 <Assets />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/requests" 
+            element={
+              <ProtectedRoute>
+                <AssetRequests />
               </ProtectedRoute>
             } 
           />

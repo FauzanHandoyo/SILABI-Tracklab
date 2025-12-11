@@ -1,6 +1,5 @@
-// ...existing code...
 import React, { useEffect, useState } from 'react'
-import { assetAPI } from '../utils/api'
+import { assetAPI, userAPI, requestAPI } from '../utils/api'
 import AddAssetForm from './AddAssetForm'
 import EditAssetForm from './EditAssetForm'
 import { supabase } from '../utils/supabase'
@@ -16,6 +15,14 @@ type Asset = {
     rawId?: number
 }
 
+type RequestModalState = {
+    isOpen: boolean
+    assetId?: string
+    assetName?: string
+    notes: string
+    submitting: boolean
+}
+
 export default function Assets() {
     const [assets, setAssets] = useState<Asset[]>([])
     const [loading, setLoading] = useState(true)
@@ -25,39 +32,78 @@ export default function Assets() {
     const [editingAsset, setEditingAsset] = useState<any | null>(null)
     const [role, setRole] = useState<string | null>(null)
     const [roleLoaded, setRoleLoaded] = useState(false)
+    const [userId, setUserId] = useState<number | null>(null)
+    const [submittedRequests, setSubmittedRequests] = useState<Set<number>>(new Set())
+    const [requestModal, setRequestModal] = useState<RequestModalState>({
+        isOpen: false,
+        notes: '',
+        submitting: false
+    })
 
     useEffect(() => {
-        const stored = localStorage.getItem('user')
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored)
-                if (parsed?.role) {
-                    setRole(parsed.role)
+        let cancelled = false
+
+        async function resolveRole() {
+            const stored = localStorage.getItem('user')
+
+            // 1) try localStorage
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored)
+                    if (parsed?.role) {
+                        setRole(parsed.role)
+                        if (parsed?.id) setUserId(parsed.id)
+                        if (!cancelled) setRoleLoaded(true)
+                        return
+                    }
+                } catch {
+                    // ignore parse error
                 }
-            } catch {
-                // ignore
+            }
+
+            // 2) try Supabase metadata
+            try {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    const r =
+                        (user.user_metadata as any)?.role ||
+                        (user.app_metadata as any)?.role ||
+                        null
+                    if (r) {
+                        setRole(r)
+                        const existing = stored ? JSON.parse(stored || '{}') : {}
+                        localStorage.setItem('user', JSON.stringify({ ...existing, role: r }))
+                        if (!cancelled) setRoleLoaded(true)
+                        return
+                    }
+                }
+            } catch (e) {
+                console.error('Supabase getUser failed', e)
+            }
+
+            // 3) fallback to backend API
+            try {
+                const resp = await userAPI.getCurrentUser()
+                const candidateRole = resp?.data?.role ?? resp?.role ?? null
+                const candidateId = resp?.data?.id ?? resp?.id ?? null
+                if (candidateRole) {
+                    setRole(candidateRole)
+                    if (candidateId) setUserId(candidateId)
+                    const existing = stored ? JSON.parse(stored || '{}') : {}
+                    localStorage.setItem('user', JSON.stringify({ ...existing, role: candidateRole, id: candidateId }))
+                }
+            } catch (e) {
+                console.error('userAPI.getCurrentUser failed', e)
+            } finally {
+                if (!cancelled) setRoleLoaded(true)
             }
         }
-        supabase.auth.getUser()
-          .then(({ data: { user } }) => {
-            if (user) {
-              const r =
-                (user.user_metadata as any)?.role ||
-                (user.app_metadata as any)?.role ||
-                null
-              if (r) {
-                setRole(r)
-                const existing = stored ? JSON.parse(stored || '{}') : {}
-                localStorage.setItem('user', JSON.stringify({ ...existing, role: r }))
-              }
-            }
-          })
-          .catch(() => {
-            // ignore
-          })
-          .finally(() => {
-            setRoleLoaded(true)
-          })
+
+        resolveRole()
+
+        return () => {
+            cancelled = true
+        }
     }, [])
 
     useEffect(() => {
@@ -66,12 +112,11 @@ export default function Assets() {
                 const response = await assetAPI.getAll()
                 console.log('Backend response:', response.data);
                 
-                // Transform backend data to match frontend type
                 const transformedData = response.data.map((asset: any) => {
                     console.log('Transforming asset:', asset);
                     return {
                         id: `LAB-${String(asset.id).padStart(3, '0')}`,
-                        rawId: Number(asset.id), // Ensure it's a number
+                        rawId: Number(asset.id),
                         name: asset.nama_aset,
                         assetType: asset.category || 'Unknown',
                         location: asset.location || 'Unknown',
@@ -109,7 +154,6 @@ export default function Assets() {
     const handleCancel = () => setShowForm(false)
 
     const handleCreated = (created: any) => {
-        // transform backend row to frontend Asset type
         const newAsset: Asset = {
             id: `LAB-${String(created.id).padStart(3, '0')}`,
             name: created.nama_aset,
@@ -129,7 +173,6 @@ export default function Assets() {
             return
         }
 
-        // convert frontend asset back to backend-ish shape for form
         setEditingAsset({
             id: a.rawId,
             nama_aset: a.name,
@@ -145,7 +188,6 @@ export default function Assets() {
     }
 
     const handleUpdate = (updatedRow: any) => {
-        // transform updated backend row to frontend Asset type
         const updatedAsset: Asset & { rawId: number } = {
             id: `LAB-${String(updatedRow.id).padStart(3, '0')}`,
             rawId: updatedRow.id,
@@ -188,12 +230,68 @@ export default function Assets() {
         }
     }
 
+    const handleOpenBorrowModal = (asset: Asset) => {
+        setRequestModal({
+            isOpen: true,
+            assetId: asset.id,
+            assetName: asset.name,
+            notes: '',
+            submitting: false
+        })
+    }
+
+    const handleCloseBorrowModal = () => {
+        setRequestModal({
+            isOpen: false,
+            notes: '',
+            submitting: false
+        })
+    }
+
+    const handleSubmitBorrowRequest = async () => {
+        if (!userId || !requestModal.assetId) {
+            setError('Invalid request data')
+            return
+        }
+
+        setRequestModal(prev => ({ ...prev, submitting: true }))
+
+        try {
+            const asset = assets.find(a => a.id === requestModal.assetId)
+            const assetRawId = asset?.rawId
+
+            await requestAPI.createRequest({
+                asset_id: assetRawId,
+                user_id: userId,
+                request_type: 'borrow',
+                status: 'pending',
+                request_date: new Date().toISOString(),
+                approval_date: null,
+                return_date: null,
+                notes: requestModal.notes
+            })
+
+            if (assetRawId) {
+                setSubmittedRequests(prev => new Set([...prev, assetRawId]))
+            }
+
+            setError(null)
+            handleCloseBorrowModal()
+            alert('Asset borrow request submitted successfully!')
+        } catch (err) {
+            console.error('Failed to submit request:', err)
+            setError('Failed to submit borrow request')
+        } finally {
+            setRequestModal(prev => ({ ...prev, submitting: false }))
+        }
+    }
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Assets</h1>
                 <div className="flex items-center gap-2">
-                  {(role == 'admin' || role == 'technician') && (
+                  {roleLoaded && (role == 'admin' || role == 'technician') && (
                     <button onClick={handleAddClick} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                         Add Asset
                     </button>
@@ -210,6 +308,46 @@ export default function Assets() {
                onCancel={() => setEditingAsset(null)}
              />
            )}
+
+            {/* Borrow Request Modal */}
+            {requestModal.isOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+                        <h2 className="text-xl font-semibold mb-4">Request to Borrow</h2>
+                        <p className="text-gray-600 mb-4">Asset: <strong>{requestModal.assetName}</strong></p>
+                        
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Notes (optional)
+                            </label>
+                            <textarea
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                rows={4}
+                                placeholder="Add any additional details about your request..."
+                                value={requestModal.notes}
+                                onChange={(e) => setRequestModal(prev => ({ ...prev, notes: e.target.value }))}
+                            />
+                        </div>
+
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                onClick={handleCloseBorrowModal}
+                                disabled={requestModal.submitting}
+                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSubmitBorrowRequest}
+                                disabled={requestModal.submitting}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                            >
+                                {requestModal.submitting ? 'Submitting...' : 'Submit Request'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="mb-4">
                 <input
@@ -247,17 +385,21 @@ export default function Assets() {
                                       {asset.status}
                                   </span>
                                   <div className="flex gap-2">
-                                    {/* hide edit/delete for plain "user" role */}
-                                    {(role == 'admin' || role == 'technician')&& (
+                                    {roleLoaded && (role == 'admin' || role == 'technician') && (
                                       <>
                                         <button onClick={() => handleEditClick(asset)} className="px-2 py-1 text-sm bg-yellow-100 rounded hover:bg-yellow-200">Edit</button>
                                         <button onClick={() => handleDelete(asset)} className="px-2 py-1 text-sm bg-red-100 rounded hover:bg-red-200">Delete</button>
                                       </>
+                                    )}
+                                    {roleLoaded && role == 'user' && asset.status === 'Present' && (
+                                      <>
+                                        {submittedRequests.has(asset.rawId!) ? (
+                                          <span className="px-2 py-1 text-sm text-gray-500 font-medium">Request Sent</span>
+                                        ) : (
+                                          <button onClick={() => handleOpenBorrowModal(asset)} className="px-2 py-1 text-sm bg-blue-100 rounded hover:bg-blue-200">Request to Borrow</button>
                                         )}
-                                    {role == 'user' && (
-                                        <>
-                                            <button onClick={() => alert('Belum implementasi fitur permintaan pinjam')} className="px-2 py-1 text-sm bg-blue-100 rounded hover:bg-blue-200">Request to Borrow</button>
-                                        </>)}
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                             </div>
@@ -273,4 +415,3 @@ export default function Assets() {
         </div>
     )
 }
-// ...existing code...
