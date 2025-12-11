@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import trackLabLogo from '../assets/tracklab-logo.jpg';
+import trackLabLogo from '../assets/tracklab-logo(NEW).jpg';
 import { authAPI } from '../utils/api';
 import { supabase } from '../utils/supabase';
 
@@ -62,9 +62,17 @@ const Navigation = () => {
   };
 
   const getLinkClass = (path: string) => {
-    return window.location.pathname === path
-      ? 'text-blue-600 font-semibold'
-      : 'text-gray-600 hover:text-blue-600';
+    const isActive = window.location.pathname === path;
+    return isActive
+      ? 'font-semibold transition'
+      : 'transition hover:opacity-80';
+  };
+
+  const getLinkStyle = (path: string) => {
+    const isActive = window.location.pathname === path;
+    return {
+      color: isActive ? '#29ADFF' : '#C2C3C7'
+    };
   };
 
   // Default minimal links for plain "user"
@@ -82,28 +90,47 @@ const Navigation = () => {
     { to: '/requests', label: 'Requests' },
     { to: '/history', label: 'History' },
     { to: '/notifications', label: 'Notifications' },
-    // add admin-only routes here, e.g. { to: '/manage-users', label: 'Manage Users' }
   ];
 
   const linksToRender = role === 'admin' || role === 'technician' ? adminLinks : userLinks;
 
   return (
-    <nav className="bg-white shadow-md px-6 py-4 flex items-center justify-between">
+    <nav className="px-6 py-4 flex items-center justify-between shadow-lg" style={{ 
+      backgroundColor: '#1D2B53',
+      borderBottom: '2px solid #5F574F'
+    }}>
       <div className="flex items-center gap-3">
-        <img src={trackLabLogo} alt="TrackLab Logo" className="h-16 w-36 rounded-full object-cover" />
+        <img 
+          src={trackLabLogo} 
+          alt="TrackLab Logo" 
+          className="h-12 w-12 rounded-full object-cover" 
+          style={{ border: '2px solid #29ADFF' }}
+        />
         <div>
-          <span className="font-bold text-lg text-gray-900">SILABI</span>
+          <span className="font-bold text-2xl" style={{ color: '#29ADFF' }}>SILABI</span>
+          <div className="text-xs" style={{ color: '#83769C' }}>Asset Management System</div>
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-6">
         {linksToRender.map((l) => (
-          <Link key={l.to} to={l.to} className={getLinkClass(l.to)}>
+          <Link 
+            key={l.to} 
+            to={l.to} 
+            className={getLinkClass(l.to)}
+            style={getLinkStyle(l.to)}
+          >
             {l.label}
           </Link>
         ))}
         <button
           onClick={handleLogout}
-          className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+          className="ml-4 px-4 py-2 rounded-lg font-semibold transition"
+          style={{ 
+            backgroundColor: '#FF004D',
+            color: '#FFF1E8'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7E2553'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF004D'}
         >
           Logout
         </button>

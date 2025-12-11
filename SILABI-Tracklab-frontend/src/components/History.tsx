@@ -31,7 +31,7 @@ export default function History() {
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'asset_history'
         },
@@ -39,13 +39,10 @@ export default function History() {
           console.log('Real-time update received:', payload);
           
           if (payload.eventType === 'INSERT') {
-            // Add new record to the top of the list
-            loadHistory(); // Reload to get full data with asset name
+            loadHistory();
           } else if (payload.eventType === 'UPDATE') {
-            // Update existing record
             loadHistory();
           } else if (payload.eventType === 'DELETE') {
-            // Remove deleted record
             setHistory(prev => prev.filter(h => h.id !== payload.old.id));
           }
         }
@@ -54,7 +51,6 @@ export default function History() {
         console.log('Subscription status:', status);
       });
 
-    // Cleanup subscription on unmount
     return () => {
       subscription.unsubscribe();
     };
@@ -90,17 +86,20 @@ export default function History() {
     if (!status) return null;
     
     const statusMap: Record<string, { bg: string; text: string }> = {
-      'Tersedia': { bg: 'bg-green-100', text: 'text-green-700' },
-      'Present': { bg: 'bg-green-100', text: 'text-green-700' },
-      'Dipinjam': { bg: 'bg-gray-900', text: 'text-white' },
-      'Missing': { bg: 'bg-red-100', text: 'text-red-700' },
-      'Dalam Perbaikan': { bg: 'bg-yellow-100', text: 'text-yellow-700' }
+      'Tersedia': { bg: '#00E436', text: '#000000' },
+      'Present': { bg: '#00E436', text: '#000000' },
+      'Dipinjam': { bg: '#FFA300', text: '#000000' },
+      'Missing': { bg: '#FF004D', text: '#FFF1E8' },
+      'Dalam Perbaikan': { bg: '#FFEC27', text: '#000000' }
     };
 
-    const style = statusMap[status] || { bg: 'bg-gray-100', text: 'text-gray-700' };
+    const style = statusMap[status] || { bg: '#5F574F', text: '#C2C3C7' };
     
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}>
+      <span 
+        className="px-3 py-1 rounded-full text-xs font-semibold"
+        style={{ backgroundColor: style.bg, color: style.text }}
+      >
         {status}
       </span>
     );
@@ -116,23 +115,31 @@ export default function History() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#000000' }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#29ADFF' }}></div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 min-h-screen" style={{ backgroundColor: '#000000' }}>
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">History</h1>
-        <div className="flex items-center gap-2">
-          <span className="text-gray-600">Last</span>
+        <div>
+          <h1 className="text-3xl font-bold" style={{ color: '#29ADFF' }}>History</h1>
+          <p className="text-sm mt-1" style={{ color: '#83769C' }}>Asset activity tracking</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span style={{ color: '#C2C3C7' }}>Last</span>
           <select 
             value={timeFilter}
             onChange={(e) => setTimeFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 rounded-lg focus:ring-2 focus:outline-none"
+            style={{ 
+              backgroundColor: '#1D2B53',
+              border: '1px solid #5F574F',
+              color: '#FFF1E8'
+            }}
           >
             <option value="1">1 day</option>
             <option value="7">7 days</option>
@@ -140,8 +147,8 @@ export default function History() {
             <option value="365">1 year</option>
           </select>
           {/* Real-time indicator */}
-          <span className="ml-2 flex items-center gap-1 text-sm text-green-600">
-            <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+          <span className="ml-2 flex items-center gap-1 text-sm" style={{ color: '#00E436' }}>
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#00E436' }}></span>
             Live
           </span>
         </div>
@@ -154,63 +161,82 @@ export default function History() {
           placeholder="Search by asset id or name"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none"
+          style={{ 
+            backgroundColor: '#1D2B53',
+            border: '1px solid #5F574F',
+            color: '#FFF1E8'
+          }}
         />
       </div>
 
-      <div className="text-right text-gray-500 mb-2">{filteredHistory.length} records</div>
+      <div className="text-right mb-2" style={{ color: '#83769C' }}>
+        {filteredHistory.length} records
+      </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 rounded">
-          <p className="text-red-700">{error}</p>
+        <div className="mb-4 p-4 rounded-lg" style={{ 
+          backgroundColor: '#7E2553',
+          border: '1px solid #FF004D'
+        }}>
+          <p style={{ color: '#FF77A8' }}>{error}</p>
         </div>
       )}
 
       {/* History Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="rounded-lg shadow-lg overflow-hidden" style={{ 
+        backgroundColor: '#1D2B53',
+        border: '1px solid #5F574F'
+      }}>
         <table className="min-w-full">
-          <thead className="bg-gray-50 border-b">
+          <thead style={{ borderBottom: '2px solid #5F574F' }}>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#C2C3C7' }}>
                 Time
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#C2C3C7' }}>
                 Asset
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#C2C3C7' }}>
                 RSSI
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#C2C3C7' }}>
                 Status
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {filteredHistory.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={4} className="px-6 py-8 text-center" style={{ color: '#83769C' }}>
                   No history records found
                 </td>
               </tr>
             ) : (
-              filteredHistory.map((record) => {
+              filteredHistory.map((record, index) => {
                 const { date, time } = formatTimestamp(record.timestamp);
                 const assetId = `LAB-${String(record.asset_id).padStart(3, '0')}`;
                 
                 return (
-                  <tr key={record.id} className="hover:bg-gray-50">
+                  <tr 
+                    key={record.id} 
+                    className="transition"
+                    style={{ borderBottom: index < filteredHistory.length - 1 ? '1px solid #5F574F' : 'none' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7E255320'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{date}</div>
-                      <div className="text-sm text-gray-500">{time}</div>
+                      <div className="text-sm" style={{ color: '#C2C3C7' }}>{date}</div>
+                      <div className="text-sm" style={{ color: '#83769C' }}>{time}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium" style={{ color: '#FFF1E8' }}>
                         {record.nama_aset || 'Unknown Asset'}
                       </div>
-                      <div className="text-sm text-gray-500">{assetId}</div>
+                      <div className="text-sm font-mono" style={{ color: '#83769C' }}>{assetId}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm" style={{ color: '#FFF1E8' }}>
                         {record.rssi ? `${record.rssi} dBm` : '-'}
                       </div>
                     </td>

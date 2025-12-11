@@ -46,9 +46,7 @@ export default function Profile() {
         last_login: userData.last_login || ''
       });
       
-      // Check if this is first-time OAuth user (has oauth_provider but no last_login)
       setIsFirstLogin(!!userData.oauth_provider && !userData.last_login);
-      
       setError('');
     } catch (err: any) {
       console.error('Error loading profile:', err);
@@ -91,26 +89,22 @@ export default function Profile() {
         username: formData.username
       };
 
-      // Allow role update for first-time OAuth users
       if (isFirstLogin) {
         updateData.role = formData.role;
       }
 
       const response = await userAPI.updateCurrentUser(updateData);
       
-      // Update localStorage with new user data
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const updatedUser = { ...currentUser, ...response.data.user };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       
       setSuccess('Profile updated successfully!');
       
-      // Mark as no longer first login
       if (isFirstLogin) {
         setIsFirstLogin(false);
       }
       
-      // Reload profile to get latest data
       await loadProfile();
     } catch (err: any) {
       console.error('Error updating profile:', err);
@@ -176,55 +170,72 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#000000' }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#29ADFF' }}></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen py-8 px-4" style={{ backgroundColor: '#000000' }}>
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold" style={{ 
+            backgroundColor: '#29ADFF',
+            color: '#000000'
+          }}>
             {formData.full_name.charAt(0).toUpperCase() || 'U'}
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{formData.full_name || 'User'}</h1>
-            <p className="text-gray-600">Role: {formData.role}</p>
+            <h1 className="text-3xl font-bold" style={{ color: '#FFF1E8' }}>{formData.full_name || 'User'}</h1>
+            <p style={{ color: '#83769C' }}>Role: {formData.role}</p>
           </div>
         </div>
 
         {/* First-time OAuth user notice */}
         {isFirstLogin && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="font-semibold text-blue-900 mb-2">Welcome! Complete Your Profile</h3>
-            <p className="text-sm text-blue-800">
+          <div className="mb-6 p-4 rounded-lg" style={{ 
+            backgroundColor: '#1D2B53',
+            border: '1px solid #29ADFF'
+          }}>
+            <h3 className="font-semibold mb-2" style={{ color: '#29ADFF' }}>Welcome! Complete Your Profile</h3>
+            <p className="text-sm" style={{ color: '#C2C3C7' }}>
               This is your first login. Please select your role below and complete your profile information.
             </p>
           </div>
         )}
 
         {/* Profile Information Form */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Profile Information</h2>
+        <div className="rounded-lg shadow-lg p-6 mb-6" style={{ 
+          backgroundColor: '#1D2B53',
+          border: '1px solid #5F574F'
+        }}>
+          <h2 className="text-xl font-semibold mb-4" style={{ color: '#29ADFF' }}>Profile Information</h2>
           
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded">
+            <div className="mb-4 p-3 rounded" style={{ 
+              backgroundColor: '#7E2553',
+              border: '1px solid #FF004D',
+              color: '#FF77A8'
+            }}>
               {error}
             </div>
           )}
           
           {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded">
+            <div className="mb-4 p-3 rounded" style={{ 
+              backgroundColor: '#008751',
+              border: '1px solid #00E436',
+              color: '#FFEC27'
+            }}>
               {success}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-1" style={{ color: '#C2C3C7' }}>
                 Full name
               </label>
               <input
@@ -232,13 +243,18 @@ export default function Profile() {
                 name="full_name"
                 value={formData.full_name}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                style={{ 
+                  backgroundColor: '#000000',
+                  border: '1px solid #5F574F',
+                  color: '#FFF1E8'
+                }}
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-1" style={{ color: '#C2C3C7' }}>
                 Email
               </label>
               <input
@@ -246,14 +262,19 @@ export default function Profile() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                style={{ 
+                  backgroundColor: !!formData.oauth_provider ? '#5F574F' : '#000000',
+                  border: '1px solid #5F574F',
+                  color: '#FFF1E8'
+                }}
                 required
-                disabled={!!formData.oauth_provider} // Disable for OAuth users
+                disabled={!!formData.oauth_provider}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-1" style={{ color: '#C2C3C7' }}>
                 Username
               </label>
               <input
@@ -261,14 +282,18 @@ export default function Profile() {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                style={{ 
+                  backgroundColor: '#000000',
+                  border: '1px solid #5F574F',
+                  color: '#FFF1E8'
+                }}
                 required
               />
             </div>
 
-            {/* Role selection - only editable for first-time OAuth users */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium mb-1" style={{ color: '#C2C3C7' }}>
                 Role
               </label>
               {isFirstLogin ? (
@@ -276,7 +301,12 @@ export default function Profile() {
                   name="role"
                   value={formData.role}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                  style={{ 
+                    backgroundColor: '#000000',
+                    border: '1px solid #5F574F',
+                    color: '#FFF1E8'
+                  }}
                   required
                 >
                   <option value="">Select a role</option>
@@ -288,12 +318,17 @@ export default function Profile() {
                 <input
                   type="text"
                   value={formData.role}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                  className="w-full px-3 py-2 rounded-lg"
+                  style={{ 
+                    backgroundColor: '#5F574F',
+                    border: '1px solid #5F574F',
+                    color: '#C2C3C7'
+                  }}
                   disabled
                 />
               )}
               {isFirstLogin && (
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm" style={{ color: '#83769C' }}>
                   Please select your role. This can only be changed by an administrator after your first login.
                 </p>
               )}
@@ -303,41 +338,57 @@ export default function Profile() {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                style={{ 
+                  backgroundColor: '#29ADFF',
+                  color: '#000000'
+                }}
+                onMouseEnter={(e) => !saving && (e.currentTarget.style.backgroundColor = '#00E436')}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#29ADFF'}
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
               <button
                 type="button"
                 onClick={handleReset}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className="px-6 py-2 rounded-lg transition"
+                style={{ 
+                  backgroundColor: '#7E2553',
+                  color: '#C2C3C7'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#AB5236'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#7E2553'}
               >
                 Reset
               </button>
             </div>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Member since:</span> {formatDate(formData.created_at)}
+          <div className="mt-6 pt-6" style={{ borderTop: '1px solid #5F574F' }}>
+            <p className="text-sm" style={{ color: '#83769C' }}>
+              <span className="font-medium" style={{ color: '#C2C3C7' }}>Member since:</span> {formatDate(formData.created_at)}
             </p>
             {formData.oauth_provider && (
-              <p className="text-sm text-gray-600 mt-1">
-                <span className="font-medium">Login method:</span> {formData.oauth_provider}
+              <p className="text-sm mt-1" style={{ color: '#83769C' }}>
+                <span className="font-medium" style={{ color: '#C2C3C7' }}>Login method:</span> {formData.oauth_provider}
               </p>
             )}
           </div>
         </div>
 
-        {/* Password Section - only for non-OAuth users */}
+        {/* Password Section */}
         {!formData.oauth_provider && (
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="rounded-lg shadow-lg p-6" style={{ 
+            backgroundColor: '#1D2B53',
+            border: '1px solid #5F574F'
+          }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Password</h2>
+              <h2 className="text-xl font-semibold" style={{ color: '#29ADFF' }}>Password</h2>
               {!showPasswordForm && (
                 <button
                   onClick={() => setShowPasswordForm(true)}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  className="font-medium hover:opacity-80 transition"
+                  style={{ color: '#29ADFF' }}
                 >
                   Change Password
                 </button>
@@ -347,19 +398,27 @@ export default function Profile() {
             {showPasswordForm && (
               <form onSubmit={handlePasswordSubmit} className="space-y-4">
                 {passwordError && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded">
+                  <div className="p-3 rounded" style={{ 
+                    backgroundColor: '#7E2553',
+                    border: '1px solid #FF004D',
+                    color: '#FF77A8'
+                  }}>
                     {passwordError}
                   </div>
                 )}
                 
                 {passwordSuccess && (
-                  <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded">
+                  <div className="p-3 rounded" style={{ 
+                    backgroundColor: '#008751',
+                    border: '1px solid #00E436',
+                    color: '#FFEC27'
+                  }}>
                     {passwordSuccess}
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#C2C3C7' }}>
                     Current Password
                   </label>
                   <input
@@ -367,13 +426,18 @@ export default function Profile() {
                     name="currentPassword"
                     value={passwordData.currentPassword}
                     onChange={handlePasswordChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      backgroundColor: '#000000',
+                      border: '1px solid #5F574F',
+                      color: '#FFF1E8'
+                    }}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#C2C3C7' }}>
                     New Password
                   </label>
                   <input
@@ -381,13 +445,18 @@ export default function Profile() {
                     name="newPassword"
                     value={passwordData.newPassword}
                     onChange={handlePasswordChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      backgroundColor: '#000000',
+                      border: '1px solid #5F574F',
+                      color: '#FFF1E8'
+                    }}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#C2C3C7' }}>
                     Confirm New Password
                   </label>
                   <input
@@ -395,7 +464,12 @@ export default function Profile() {
                     name="confirmPassword"
                     value={passwordData.confirmPassword}
                     onChange={handlePasswordChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                    style={{ 
+                      backgroundColor: '#000000',
+                      border: '1px solid #5F574F',
+                      color: '#FFF1E8'
+                    }}
                     required
                   />
                 </div>
@@ -404,7 +478,13 @@ export default function Profile() {
                   <button
                     type="submit"
                     disabled={changingPassword}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="px-6 py-2 rounded-lg disabled:opacity-50 transition"
+                    style={{ 
+                      backgroundColor: '#29ADFF',
+                      color: '#000000'
+                    }}
+                    onMouseEnter={(e) => !changingPassword && (e.currentTarget.style.backgroundColor = '#00E436')}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#29ADFF'}
                   >
                     {changingPassword ? 'Changing...' : 'Change Password'}
                   </button>
@@ -420,7 +500,13 @@ export default function Profile() {
                       setPasswordError('');
                       setPasswordSuccess('');
                     }}
-                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                    className="px-6 py-2 rounded-lg transition"
+                    style={{ 
+                      backgroundColor: '#7E2553',
+                      color: '#C2C3C7'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#AB5236'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#7E2553'}
                   >
                     Cancel
                   </button>

@@ -150,7 +150,7 @@ async function deleteRequest(id) {
 async function approveRequest(id) {
     const query = `
     UPDATE aset_requests
-    SET status = 'Approved',
+    SET status = 'approved',
         approval_date = NOW()
     WHERE id = $1
     RETURNING *;
@@ -162,7 +162,7 @@ async function approveRequest(id) {
 async function denyRequest(id) {
     const query = `
     UPDATE aset_requests
-    SET status = 'Denied',
+    SET status = 'denied',
         approval_date = NOW()
     WHERE id = $1
     RETURNING *;

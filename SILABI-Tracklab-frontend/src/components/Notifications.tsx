@@ -119,23 +119,31 @@ export default function Notifications() {
     });
   };
 
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#000000' }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#29ADFF' }}></div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 min-h-screen" style={{ backgroundColor: '#000000' }}>
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Notifications</h1>
+        <div>
+          <h1 className="text-3xl font-bold" style={{ color: '#29ADFF' }}>Notifications</h1>
+          <p className="text-sm mt-1" style={{ color: '#83769C' }}>
+            {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up!'}
+          </p>
+        </div>
         {notifications.some(n => !n.is_read) && (
           <button
             onClick={handleMarkAllAsRead}
-            className="text-blue-600 hover:text-blue-700 font-medium"
+            className="font-medium hover:opacity-80 transition"
+            style={{ color: '#29ADFF' }}
           >
             Mark all as read
           </button>
@@ -143,37 +151,50 @@ export default function Notifications() {
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 rounded">
-          <p className="text-red-700">{error}</p>
+        <div className="mb-4 p-4 rounded-lg" style={{ 
+          backgroundColor: '#7E2553',
+          border: '1px solid #FF004D'
+        }}>
+          <p style={{ color: '#FF77A8' }}>{error}</p>
         </div>
       )}
 
       {/* Notifications List */}
       <div className="space-y-4">
         {notifications.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-            No notifications
+          <div className="rounded-lg shadow p-8 text-center" style={{ 
+            backgroundColor: '#1D2B53',
+            border: '1px solid #5F574F'
+          }}>
+            <div className="text-6xl mb-4">🔔</div>
+            <p style={{ color: '#83769C' }}>No notifications</p>
           </div>
         ) : (
           notifications.map((notification) => (
             <div
               key={notification.id}
-              className={`bg-white rounded-lg shadow p-6 ${
-                !notification.is_read ? 'border-l-4 border-blue-600' : ''
-              }`}
+              className="rounded-lg shadow p-6 transition"
+              style={{
+                backgroundColor: '#1D2B53',
+                borderLeft: !notification.is_read ? '4px solid #29ADFF' : '4px solid transparent',
+                border: !notification.is_read ? '1px solid #5F574F' : '1px solid #5F574F'
+              }}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold" style={{ color: '#FFF1E8' }}>
                       {notification.title}
                     </h3>
                     {!notification.is_read && (
-                      <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                      <span 
+                        className="w-2 h-2 rounded-full" 
+                        style={{ backgroundColor: '#29ADFF' }}
+                      ></span>
                     )}
                   </div>
-                  <p className="text-gray-600 mt-2">{notification.message}</p>
-                  <p className="text-sm text-gray-400 mt-2">
+                  <p className="mt-2" style={{ color: '#C2C3C7' }}>{notification.message}</p>
+                  <p className="text-sm mt-2" style={{ color: '#83769C' }}>
                     {formatDate(notification.created_at)}
                   </p>
                 </div>
@@ -181,14 +202,16 @@ export default function Notifications() {
                   {!notification.is_read && (
                     <button
                       onClick={() => handleMarkAsRead(notification.id)}
-                      className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      className="text-sm font-medium hover:opacity-80 transition"
+                      style={{ color: '#29ADFF' }}
                     >
                       Mark as read
                     </button>
                   )}
                   <button
                     onClick={() => handleDelete(notification.id)}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium"
+                    className="text-sm font-medium hover:opacity-80 transition"
+                    style={{ color: '#FF004D' }}
                   >
                     Delete
                   </button>
