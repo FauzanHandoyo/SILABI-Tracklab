@@ -5,20 +5,17 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 
-// --- KONFIGURASI PENTING ---
-// Ganti sesuai dengan "[!!!] Gateway Channel: X" di Serial Monitor Gateway
-#define WIFI_CHANNEL 5
+#define WIFI_CHANNEL 6
 
-// MAC Address Gateway (TARGET)
 uint8_t gatewayAddress[] = {0x68, 0x25, 0xDD, 0x48, 0x2F, 0xD8};
 #define MSG_CONFIG  1
 #define MSG_REPORT  2
 
 typedef struct silabi_message {
-    uint8_t msgType;      // 1=Config, 2=Report
-    int asset_id;         // ID Aset
-    char asset_name[30];  // Nama Aset
-    int status;           // 1=Tersedia, 0=Hilang
+    uint8_t msgType;     
+    int asset_id;         
+    char asset_name[30];  
+    int status;           
     int rssi;
 } silabi_message;
 
@@ -37,7 +34,7 @@ struct AsetTarget {
 
 std::vector<AsetTarget> daftarAset;
 static BLEScan* pBLEScan;
-int scanTime = 8;
+int scanTime = 12;
 
 void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingData, int len) {
   memcpy(&dataMasuk, incomingData, sizeof(dataMasuk));
@@ -77,15 +74,12 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
         if (deviceName == daftarAset[i].nama) {
           daftarAset[i].ditemukan = true;
           daftarAset[i].rssi = advertisedDevice.getRSSI();
-          // Serial.printf("   -> Ketemu: %s\n", deviceName.c_str());
         }
       }
     }
 };
 
 void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
-  // Debug
-  // Serial.print(status == ESP_NOW_SEND_SUCCESS ? "." : "!");
 }
 
 void setup() {
@@ -97,13 +91,11 @@ void setup() {
    esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
    Serial.printf("[Info] WiFi Channel dikunci ke: %d\n", WIFI_CHANNEL);
 
-   // 2. Init ESP-NOW
    if (esp_now_init() != ESP_OK) {
       Serial.println("Error inisialisasi ESP-NOW");
       ESP.restart();
    }
    
-   // Register Callback
    esp_now_register_recv_cb(OnDataRecv);
    esp_now_register_send_cb(OnDataSent);
 
@@ -133,7 +125,7 @@ void loop() {
       return;
    }
 
-   Serial.printf("\n--- Memulai Scan (%d Aset Target) ---\n", daftarAset.size());
+   Serial.printf("\n--- Scan (%d Aset) ---\n", daftarAset.size());
 
    for (int i = 0; i < daftarAset.size(); i++) {
       daftarAset[i].ditemukan = false;
@@ -147,10 +139,7 @@ void loop() {
       String statusSekarang = daftarAset[i].ditemukan ? "DI TEMPAT" : "HILANG";
       int statusCode = daftarAset[i].ditemukan ? 1 : 0;
       int rssiValue = daftarAset[i].rssi;
-      // Debug
-      // Serial.printf("Aset: %s -> %s (RSSI: %d)\n", daftarAset[i].nama.c_str(), statusSekarang.c_str());
 
-      // Kirim HANYA jika status berubah
       if (statusSekarang != daftarAset[i].statusTerakhir) {
          Serial.printf("[UPDATE] %s -> %s (RSSI: %d). Mengirim...\n", daftarAset[i].nama.c_str(), statusSekarang.c_str(), rssiValue);
          
@@ -168,6 +157,4 @@ void loop() {
          }
       }
    }
-   
-   delay(2000);
 }

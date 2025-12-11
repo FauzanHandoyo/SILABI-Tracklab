@@ -6,16 +6,16 @@
 #include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
 
-// --- WIFI CRED ---
+// --- WIFI ---
 const char* ssid = "Drowsy";
 const char* password = "sleepyhead";
 
 // --- ENDPOINT VERCEL ---
 const char* apiHost = "https://backend-hardware-p8o9odj2v-fauzanhandoyos-projects.vercel.app"; 
 
-// --- KONFIGURASI TIPE PESAN ---
-#define MSG_CONFIG  1  // Gateway -> Scanner (Kirim Nama Aset)
-#define MSG_REPORT  2  // Scanner -> Gateway (Lapor Status)
+
+#define MSG_CONFIG  1
+#define MSG_REPORT  2
 
 /*
 volatile bool dataSiapDikirim = false; 
@@ -32,22 +32,20 @@ struct PesanAntrian {
 
 std::vector<PesanAntrian> antrianPengiriman;
 
-// --- STRUKTUR DATA BARU (WAJIB SAMA DENGAN SCANNER) ---
+
 typedef struct silabi_message {
-    uint8_t msgType;      // 1=Config, 2=Report
-    int asset_id;         // ID Aset
-    char asset_name[30];  // Nama Aset
-    int status;           // 1=Di Tempat, 0=Hilang
+    uint8_t msgType;
+    int asset_id;        
+    char asset_name[30]; 
+    int status;          
     int rssi;
 } silabi_message;
 
 silabi_message dataDiterima;
 
-// --- MEMORY ---
 #define MAX_ASSETS 20 
 String assetLookupTable[MAX_ASSETS]; 
 
-// Broadcast Address (FF:FF:FF:FF:FF:FF)
 uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 void initAssetTable() {
@@ -56,7 +54,6 @@ void initAssetTable() {
   }
 }
 
-// --- FUNGSI BARU: Broadcast Daftar Aset ke Scanner ---
 void broadcastAssetList() {
   Serial.println("\n[Gateway] Membagikan daftar aset ke Scanner...");
   
@@ -67,22 +64,15 @@ void broadcastAssetList() {
 
   esp_now_peer_info_t peerInfo;
   
-  // --- [PERBAIKAN PENTING] ---
-  // 1. Bersihkan memory dulu (agar tidak ada data sampah)
   memset(&peerInfo, 0, sizeof(peerInfo));
   
-  // 2. Set Alamat Broadcast
   memcpy(peerInfo.peer_addr, broadcastAddress, 6);
   
-  // 3. Tentukan Interface: Gunakan WIFI_IF_STA (Station/WiFi)
-  // Karena Gateway terhubung ke Router, kita kirim lewat channel Router.
   peerInfo.ifidx = WIFI_IF_STA; 
   
-  peerInfo.channel = 0; // 0 artinya ikut channel WiFi saat ini
+  peerInfo.channel = 0; 
   peerInfo.encrypt = false;
-  // ---------------------------
-  
-  // Cek apakah peer broadcast sudah ada
+
   if (!esp_now_is_peer_exist(broadcastAddress)) {
      esp_err_t addStatus = esp_now_add_peer(&peerInfo);
      if (addStatus != ESP_OK) {
@@ -91,7 +81,6 @@ void broadcastAssetList() {
      }
   }
 
-  // Loop array lookup table kita
   for (int i = 0; i < MAX_ASSETS; i++) {
     if (assetLookupTable[i].indexOf("UNKNOWN_ID") == -1) {
       
@@ -103,7 +92,6 @@ void broadcastAssetList() {
       if (result == ESP_OK) {
         Serial.printf(" -> Mengirim Config: ID %d (%s)\n", i, msg.asset_name);
       } else {
-        // Jika masih gagal, coba print errornya
         Serial.println(" -> Gagal kirim config.");
       }
       
@@ -117,13 +105,11 @@ void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingDa
   
   memcpy(&dataDiterima, incomingData, sizeof(dataDiterima));
 
-  // FILTER: Hanya proses jika tipe pesannya adalah REPORT (Laporan)
   if (dataDiterima.msgType == MSG_REPORT) {
 
       String namaAset;
       int id = dataDiterima.asset_id;
 
-      // Lookup Nama (Validasi ID)
       if (id >= 0 && id < MAX_ASSETS) {
         namaAset = assetLookupTable[id]; 
       } else {
@@ -135,17 +121,15 @@ void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingDa
       
       Serial.printf("\n[ESP-NOW] Masuk ID %d: %s -> %s (RSSI: %d)\n", id, namaAset.c_str(), statusSekarang.c_str(), rssiSekarang);
 
-      // Logika Antrian
       PesanAntrian pesanBaru;
       pesanBaru.nama = namaAset;
       pesanBaru.status = statusSekarang;
       pesanBaru.rssi = rssiSekarang;
   
-      antrianPengiriman.push_back(pesanBaru); // Masukkan ke belakang antrian
+      antrianPengiriman.push_back(pesanBaru);
   
       Serial.printf("[Queue] Ditambahkan ke antrian. Total antrian: %d\n", antrianPengiriman.size());
   } 
-  // Jika msgType == MSG_CONFIG, diabaikan (karena itu broadcast kita sendiri)
 }
 
 void fetchAssetList() {
@@ -212,17 +196,11 @@ void fetchAssetList() {
   /*
   Serial.println("----------------------------------------");
   Serial.println("[Sync] DUMMY DATA");
-  
-  // 1. Reset tabel aset
   initAssetTable();
 
-  // 2. Masukkan Data Dummy secara Manual
   // Format: assetLookupTable[ID] = "NAMA_ASET";
-  
   assetLookupTable[0] = "SILABI_reactor"; 
   Serial.println("   [+ Added] ID 0 -> SILABI_reactor");
-
-  // Jika Anda punya tag kedua, bisa tambahkan di sini:
   assetLookupTable[1] = "SILABI_osiloskop";
   Serial.println("   [+ Added] ID 1 -> SILABI_osiloskop");
 
@@ -237,58 +215,39 @@ void setup() {
 
   initAssetTable();
 
-  // 1. Set Mode WiFi Dulu (Best Practice)
   WiFi.mode(WIFI_AP_STA);
-
-  // 2. Connect WiFi
   setupWiFi();
 
   Serial.print("[!!!] Gateway MAC: ");
   Serial.println(WiFi.macAddress());
   Serial.printf("[!!!] Gateway Channel: %d\n", WiFi.channel());
 
-  // 3. Download List dari Database
   fetchAssetList();
 
-  // 4. Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error inisialisasi ESP-NOW");
     return;
   }
   esp_now_register_recv_cb(OnDataRecv);
 
-  // 5. BROADCAST LIST KE SCANNER
-  // Scanner akan menerima list ini dan mulai bekerja otomatis
   broadcastAssetList();
 
   Serial.println("\n[Test] Kirim status BOOT ke Vercel...");
-  // Gunakan "DI TEMPAT" agar DB mencatat "Tersedia"
   kirimKeCloud("SILABI_GATEWAY_BOOT", "DI TEMPAT", -69420); 
   
   Serial.println("\n>>> GATEWAY SIAP MENERIMA DATA <<<");
 }
 
 void loop() {
-  // Cek apakah ada antrian
   if (!antrianPengiriman.empty()) {
     
-    // Ambil pesan paling depan (indeks 0)
     PesanAntrian pesan = antrianPengiriman.front();
     
     Serial.printf("[Loop] Memproses antrian: %s -> %s\n", pesan.nama.c_str(), pesan.status.c_str());
-    
-    // Kirim ke Cloud
     kirimKeCloud(pesan.nama, pesan.status, pesan.rssi);
-    
-    // Hapus pesan dari antrian setelah dikirim
     antrianPengiriman.erase(antrianPengiriman.begin());
-    
-    // Delay kecil agar tidak membanjiri server
     delay(500); 
   }
-  
-  // Tidak perlu delay(2000) yang besar di sini, biarkan loop berjalan cepat
-  // untuk mengecek antrian baru.
   delay(10);
 }
 
@@ -312,7 +271,6 @@ void kirimKeCloud(String namaAset, String status, int rssi) {
   WiFiClientSecure client_secure; 
   HTTPClient http;
   
-  // Pastikan URL API sudah benar
   String url = String(apiHost) + "/api/update-status"; 
   
   JsonDocument doc;
