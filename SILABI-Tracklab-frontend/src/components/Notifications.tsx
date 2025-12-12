@@ -110,12 +110,14 @@ export default function Notifications() {
     return date.toLocaleDateString('en-US', {
       month: '2-digit',
       day: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'Asia/Jakarta'
     }) + ', ' + date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      hour12: true
+      hour12: false,
+      timeZone: 'Asia/Jakarta'
     });
   };
 

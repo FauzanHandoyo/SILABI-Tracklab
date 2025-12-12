@@ -5,9 +5,7 @@ interface Asset {
   id: string;
   name: string;
   category: string;
-  location: string;
   status: string;
-  assigned: string;
   lastUpdated: string;
 }
 
@@ -15,18 +13,21 @@ const statusColors: Record<string, string> = {
   'Inactive': 'text-white',
   'Available': 'text-white',
   'Missing': 'text-white',
+  'Borrowed': 'text-white',
 };
 
 const statusBgColors: Record<string, string> = {
   'Inactive': '#FFA300',
   'Available': '#00E436',
   'Missing': '#FF004D',
+  'Borrowed': '#29ADFF',
 };
 
 const statusBadge: Record<string, string> = {
   'Inactive': 'Inactive',
   'Available': 'Available',
   'Missing': 'Missing',
+  'Borrowed': 'Borrowed',
 };
 
 const Dashboard: React.FC = () => {
@@ -47,15 +48,15 @@ const Dashboard: React.FC = () => {
         id: `LAB-${String(asset.id).padStart(3, '0')}`,
         name: asset.nama_aset,
         category: asset.category || 'Unknown',
-        location: asset.location || 'Unknown',
         status: asset.status_hilang 
           ? 'Missing' 
           : asset.status_aset === 'Tersedia' 
           ? 'Available' 
           : asset.status_aset === 'Dipinjam'
+          ? 'Borrowed'
+          : asset.status_aset === 'Dalam Perbaikan'
           ? 'Inactive'
           : 'Available',
-        assigned: asset.assigned_to || asset.peminjam || '',
         lastUpdated: asset.last_updated 
           ? new Date(asset.last_updated).toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0],
@@ -72,12 +73,14 @@ const Dashboard: React.FC = () => {
   const totalAssets = assets.length;
   const inUse = assets.filter(a => a.status === 'Inactive').length;
   const available = assets.filter(a => a.status === 'Available').length;
+  const borrowed = assets.filter(a => a.status === 'Borrowed').length;
   const missing = assets.filter(a => a.status === 'Missing').length;
 
   const tabs = [
     { label: `All Assets (${totalAssets})`, filter: () => true },
-    { label: `Inactive (${inUse})`, filter: (a: Asset) => a.status === 'Inactive' },
     { label: `Available (${available})`, filter: (a: Asset) => a.status === 'Available' },
+    { label: `Borrowed (${borrowed})`, filter: (a: Asset) => a.status === 'Borrowed' },
+    { label: `Inactive (${inUse})`, filter: (a: Asset) => a.status === 'Inactive' },
     { label: `Missing (${missing})`, filter: (a: Asset) => a.status === 'Missing' },
   ];
 
@@ -100,34 +103,46 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <div className="rounded-xl p-4 flex flex-col items-center" style={{ 
+      <div className="mb-8 space-y-4">
+        {/* Total Assets - Standalone */}
+        <div className="rounded-xl p-6 flex flex-col items-center" style={{ 
           backgroundColor: '#1D2B53',
           border: '1px solid #5F574F'
         }}>
-          <div className="text-xs mb-1" style={{ color: '#83769C' }}>Total Assets</div>
-          <div className="text-2xl font-bold" style={{ color: '#FFF1E8' }}>{totalAssets}</div>
+          <div className="text-sm mb-2" style={{ color: '#83769C' }}>Total Assets</div>
+          <div className="text-4xl font-bold" style={{ color: '#FFF1E8' }}>{totalAssets}</div>
         </div>
-        <div className="rounded-xl p-4 flex flex-col items-center" style={{ 
-          backgroundColor: '#1D2B53',
-          border: '1px solid #5F574F'
-        }}>
-          <div className="text-xs mb-1" style={{ color: '#FFA300' }}>Inactive</div>
-          <div className="text-2xl font-bold" style={{ color: '#FFA300' }}>{inUse}</div>
-        </div>
-        <div className="rounded-xl p-4 flex flex-col items-center" style={{ 
-          backgroundColor: '#1D2B53',
-          border: '1px solid #5F574F'
-        }}>
-          <div className="text-xs mb-1" style={{ color: '#00E436' }}>Available</div>
-          <div className="text-2xl font-bold" style={{ color: '#00E436' }}>{available}</div>
-        </div>
-        <div className="rounded-xl p-4 flex flex-col items-center" style={{ 
-          backgroundColor: '#1D2B53',
-          border: '1px solid #5F574F'
-        }}>
-          <div className="text-xs mb-1" style={{ color: '#FF004D' }}>Missing</div>
-          <div className="text-2xl font-bold" style={{ color: '#FF004D' }}>{missing}</div>
+
+        {/* Status Cards - 2x2 Grid */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded-xl p-4 flex flex-col items-center" style={{ 
+            backgroundColor: '#1D2B53',
+            border: '1px solid #5F574F'
+          }}>
+            <div className="text-xs mb-1" style={{ color: '#00E436' }}>Available</div>
+            <div className="text-2xl font-bold" style={{ color: '#00E436' }}>{available}</div>
+          </div>
+          <div className="rounded-xl p-4 flex flex-col items-center" style={{ 
+            backgroundColor: '#1D2B53',
+            border: '1px solid #5F574F'
+          }}>
+            <div className="text-xs mb-1" style={{ color: '#29ADFF' }}>Borrowed</div>
+            <div className="text-2xl font-bold" style={{ color: '#29ADFF' }}>{borrowed}</div>
+          </div>
+          <div className="rounded-xl p-4 flex flex-col items-center" style={{ 
+            backgroundColor: '#1D2B53',
+            border: '1px solid #5F574F'
+          }}>
+            <div className="text-xs mb-1" style={{ color: '#FFA300' }}>Inactive</div>
+            <div className="text-2xl font-bold" style={{ color: '#FFA300' }}>{inUse}</div>
+          </div>
+          <div className="rounded-xl p-4 flex flex-col items-center" style={{ 
+            backgroundColor: '#1D2B53',
+            border: '1px solid #5F574F'
+          }}>
+            <div className="text-xs mb-1" style={{ color: '#FF004D' }}>Missing</div>
+            <div className="text-2xl font-bold" style={{ color: '#FF004D' }}>{missing}</div>
+          </div>
         </div>
       </div>
 
@@ -164,9 +179,7 @@ const Dashboard: React.FC = () => {
                 <th className="py-2 px-3 text-left font-semibold" style={{ color: '#C2C3C7' }}>Asset ID</th>
                 <th className="py-2 px-3 text-left font-semibold" style={{ color: '#C2C3C7' }}>Name</th>
                 <th className="py-2 px-3 text-left font-semibold" style={{ color: '#C2C3C7' }}>Category</th>
-                <th className="py-2 px-3 text-left font-semibold" style={{ color: '#C2C3C7' }}>Location</th>
                 <th className="py-2 px-3 text-left font-semibold" style={{ color: '#C2C3C7' }}>Status</th>
-                <th className="py-2 px-3 text-left font-semibold" style={{ color: '#C2C3C7' }}>Assigned To</th>
                 <th className="py-2 px-3 text-left font-semibold" style={{ color: '#C2C3C7' }}>Last Updated</th>
               </tr>
             </thead>
@@ -176,21 +189,17 @@ const Dashboard: React.FC = () => {
                   <td className="py-2 px-3 font-mono" style={{ color: '#FFF1E8' }}>{asset.id}</td>
                   <td className="py-2 px-3" style={{ color: '#FFF1E8' }}>{asset.name}</td>
                   <td className="py-2 px-3 underline cursor-pointer" style={{ color: '#29ADFF' }}>{asset.category}</td>
-                  <td className="py-2 px-3 underline cursor-pointer" style={{ color: '#29ADFF' }}>{asset.location}</td>
                   <td className="py-2 px-3">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[asset.status]}`} style={{ backgroundColor: statusBgColors[asset.status] }}>
                       {statusBadge[asset.status]}
                     </span>
-                  </td>
-                  <td className="py-2 px-3" style={{ color: '#FFF1E8' }}>
-                    {asset.assigned || <span style={{ color: '#5F574F' }}>—</span>}
                   </td>
                   <td className="py-2 px-3" style={{ color: '#83769C' }}>{asset.lastUpdated}</td>
                 </tr>
               ))}
               {assets.filter(tabs[activeTab].filter).length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-4 text-center" style={{ color: '#5F574F' }}>No assets found.</td>
+                  <td colSpan={5} className="py-4 text-center" style={{ color: '#5F574F' }}>No assets found.</td>
                 </tr>
               )}
             </tbody>

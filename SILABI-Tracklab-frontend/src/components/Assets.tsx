@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { assetAPI, userAPI, requestAPI } from '../utils/api'
 import AddAssetForm from './AddAssetForm'
 import EditAssetForm from './EditAssetForm'
@@ -13,6 +13,7 @@ type Asset = {
     rssi: number
     status: 'Present' | 'Missing' | 'Inactive' | 'Borrowed'
     rawId?: number
+    borrowedBy?: string
 }
 
 type RequestModalState = {
@@ -20,7 +21,9 @@ type RequestModalState = {
     assetId?: string
     assetName?: string
     notes: string
+    returnDate: string
     submitting: boolean
+    error: string
 }
 
 type DeleteModalState = {
@@ -46,13 +49,25 @@ export default function Assets() {
     const [requestModal, setRequestModal] = useState<RequestModalState>({
         isOpen: false,
         notes: '',
-        submitting: false
+        returnDate: '',
+        submitting: false,
+        error: ''
     })
     const [deleteModal, setDeleteModal] = useState<DeleteModalState>({
         isOpen: false,
         asset: null,
         deleting: false
     })
+    const returnDateInputRef = useRef<HTMLInputElement | null>(null)
+
+    const toWIBDateTime = (value: string | number | Date) =>
+    new Date(value).toLocaleString('en-GB', {
+        timeZone: 'Asia/Jakarta',
+        hour12: false,
+    });
+
+    const toWIBDate = (value: string | number | Date) =>
+    new Date(value).toLocaleDateString('en-GB', { timeZone: 'Asia/Jakarta' });
 
     useEffect(() => {
         let cancelled = false
@@ -98,8 +113,8 @@ export default function Assets() {
             // 3) fallback to backend API
             try {
                 const resp = await userAPI.getCurrentUser()
-                const candidateRole = resp?.data?.role ?? resp?.role ?? null
-                const candidateId = resp?.data?.id ?? resp?.id ?? null
+                const candidateRole = resp?.data?.role ?? null
+                const candidateId = resp?.data?.id ?? null
                 if (candidateRole) {
                     setRole(candidateRole)
                     if (candidateId) setUserId(candidateId)
@@ -148,7 +163,8 @@ export default function Assets() {
                         location: asset.location || 'Unknown',
                         lastSeen: asset.last_updated || new Date().toISOString(),
                         rssi: asset.latitude && asset.longitude ? -60 : 0,
-                        status: status
+                        status: status,
+                        borrowedBy: asset.peminjam || asset.assigned_to || ''
                     }
                 })
                 console.log('Transformed assets:', transformedData);
@@ -174,7 +190,7 @@ export default function Assets() {
                     const userRequests = response.data?.filter(
                         (r: any) => r.user_id === userId && r.status === 'pending'
                     ) || []
-                    const assetIds = new Set(userRequests.map((r: any) => r.asset_id))
+                    const assetIds = new Set<number>(userRequests.map((r: any) => Number(r.asset_id)))
                     setSubmittedRequests(assetIds)
                 } catch (err) {
                     console.error('Failed to fetch user requests:', err)
@@ -197,6 +213,27 @@ export default function Assets() {
         
         return matchesSearch && matchesStatus && matchesCategory
     })
+
+    const minReturnDate = new Date()
+    minReturnDate.setDate(minReturnDate.getDate() + 1)
+    const maxReturnDate = new Date()
+    maxReturnDate.setFullYear(maxReturnDate.getFullYear() + 1)
+    const minReturnDateStr = minReturnDate.toISOString().split('T')[0]
+    const maxReturnDateStr = maxReturnDate.toISOString().split('T')[0]
+
+    const openDatePicker = (input: HTMLInputElement | null) => {
+        if (!input) return
+        try {
+            if (typeof input.showPicker === 'function') {
+                input.showPicker()
+                return
+            }
+        } catch {
+            // fall through to focus+click
+        }
+        input.focus()
+        input.click()
+    }
 
     const handleAddClick = () => setShowAddModal(true)
     const handleCancelAdd = () => setShowAddModal(false)
@@ -222,7 +259,8 @@ export default function Assets() {
             lastSeen: created.last_updated || new Date().toISOString(),
             rssi: created.latitude && created.longitude ? -60 : 0,
             status: status,
-            rawId: created.id
+            rawId: created.id,
+            borrowedBy: created.peminjam || created.assigned_to || ''
         }
         setAssets(prev => [newAsset, ...prev])
         setShowAddModal(false)
@@ -274,7 +312,8 @@ export default function Assets() {
             location: updatedRow.location || 'Unknown',
             lastSeen: updatedRow.last_updated || new Date().toISOString(),
             rssi: updatedRow.latitude && updatedRow.longitude ? -60 : 0,
-            status: status
+            status: status,
+            borrowedBy: updatedRow.peminjam || updatedRow.assigned_to || ''
         }
         setAssets(prev => prev.map(a => (a.rawId === updatedAsset.rawId ? updatedAsset : a)))
         setShowEditModal(false)
@@ -329,7 +368,9 @@ export default function Assets() {
             assetId: asset.id,
             assetName: asset.name,
             notes: '',
-            submitting: false
+            returnDate: '',
+            submitting: false,
+            error: ''
         })
     }
 
@@ -337,13 +378,20 @@ export default function Assets() {
         setRequestModal({
             isOpen: false,
             notes: '',
-            submitting: false
+            returnDate: '',
+            submitting: false,
+            error: ''
         })
     }
 
     const handleSubmitBorrowRequest = async () => {
         if (!userId || !requestModal.assetId) {
-            setError('Invalid request data')
+            setRequestModal(prev => ({ ...prev, error: 'Invalid request data' }))
+            return
+        }
+
+        if (!requestModal.returnDate) {
+            setRequestModal(prev => ({ ...prev, error: 'Return date is required' }))
             return
         }
 
@@ -358,6 +406,9 @@ export default function Assets() {
                 user_id: userId,
                 request_type: 'borrow',
                 status: 'pending',
+                request_date: new Date().toISOString(),
+                approval_date: null,
+                return_date: requestModal.returnDate,
                 notes: requestModal.notes
             })
 
@@ -365,12 +416,11 @@ export default function Assets() {
                 setSubmittedRequests(prev => new Set([...prev, assetRawId]))
             }
 
-            setError(null)
             handleCloseBorrowModal()
             alert('Asset borrow request submitted successfully!')
         } catch (err) {
             console.error('Failed to submit request:', err)
-            setError('Failed to submit borrow request')
+            setRequestModal(prev => ({ ...prev, error: 'Failed to submit borrow request' }))
         } finally {
             setRequestModal(prev => ({ ...prev, submitting: false }))
         }
@@ -494,6 +544,16 @@ export default function Assets() {
                         <h2 className="text-xl font-semibold mb-4" style={{ color: '#29ADFF' }}>Request to Borrow</h2>
                         <p className="mb-4" style={{ color: '#C2C3C7' }}>Asset: <strong style={{ color: '#FFF1E8' }}>{requestModal.assetName}</strong></p>
                         
+                        {requestModal.error && (
+                            <div className="mb-4 p-3 rounded" style={{ 
+                                backgroundColor: '#7E2553',
+                                border: '1px solid #FF004D',
+                                color: '#FF77A8'
+                            }}>
+                                {requestModal.error}
+                            </div>
+                        )}
+                        
                         <div className="mb-4">
                             <label className="block text-sm font-medium mb-2" style={{ color: '#C2C3C7' }}>
                                 Notes (optional)
@@ -510,6 +570,68 @@ export default function Assets() {
                                 value={requestModal.notes}
                                 onChange={(e) => setRequestModal(prev => ({ ...prev, notes: e.target.value }))}
                             />
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium mb-2" style={{ color: '#C2C3C7' }}>
+                                Return Date <span style={{ color: '#FF004D' }}>*</span>
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="date"
+                                    required
+                                    className="w-full px-3 pr-12 py-2 rounded-lg focus:outline-none focus:ring-2"
+                                    style={{ 
+                                        backgroundColor: '#000000',
+                                        border: '1px solid #5F574F',
+                                        color: '#FFF1E8'
+                                    }}
+                                    value={requestModal.returnDate}
+                                    onChange={(e) => setRequestModal(prev => ({ ...prev, returnDate: e.target.value }))}
+                                    min={minReturnDateStr}
+                                    max={maxReturnDateStr}
+                                    ref={returnDateInputRef}
+                                    onClick={(e) => openDatePicker(e.currentTarget)}
+                                    onFocus={(e) => openDatePicker(e.currentTarget)}
+                                    onKeyDown={(e) => e.preventDefault()}
+                                />
+                                <button
+                                    type="button"
+                                    aria-label="Open calendar"
+                                    onClick={() => {
+                                        const el = returnDateInputRef.current
+                                        if (el) {
+                                            openDatePicker(el)
+                                            el.focus()
+                                        }
+                                    }}
+                                    className="absolute inset-y-0 right-0 px-3 flex items-center justify-center"
+                                    style={{
+                                        backgroundColor: '#1D2B53',
+                                        borderLeft: '1px solid #5F574F',
+                                        borderRadius: '0 0.5rem 0.5rem 0'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#163366'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1D2B53'}
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="#29ADFF"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        width="20"
+                                        height="20"
+                                    >
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                        <line x1="16" y1="2" x2="16" y2="6" />
+                                        <line x1="8" y1="2" x2="8" y2="6" />
+                                        <line x1="3" y1="10" x2="21" y2="10" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex gap-2 justify-end">
@@ -659,8 +781,8 @@ export default function Assets() {
                                 <div><span style={{ color: '#83769C' }}>Signal:</span> {asset.rssi} dBm</div>
                             )}
                             
-                            {/* Last seen - shown for all statuses */}
-                            <div><span style={{ color: '#83769C' }}>Last seen:</span> {new Date(asset.lastSeen).toLocaleString()}</div>
+                                        {/* Last seen - shown for all statuses */}
+                                        <div><span style={{ color: '#83769C' }}>Last seen:</span> {toWIBDateTime(asset.lastSeen)}</div>
                             
                             {/* Status-specific information */}
                             {asset.status === 'Missing' && (
@@ -671,7 +793,7 @@ export default function Assets() {
                             
                             {asset.status === 'Borrowed' && (
                                 <div className="mt-2 pt-2" style={{ borderTop: '1px solid #5F574F' }}>
-                                    <span style={{ color: '#29ADFF' }}>📋 Currently borrowed</span>
+                                    <span style={{ color: '#29ADFF' }}>📋 Currently borrowed by {asset.borrowedBy || 'Unknown'}</span>
                                 </div>
                             )}
                             

@@ -22,8 +22,16 @@ export default function History() {
   const [search, setSearch] = useState('');
   const [timeFilter, setTimeFilter] = useState('7');
 
-  useEffect(() => {
-    loadHistory();
+  const toWIBDateTime = (value: string | number | Date) =>
+  new Date(value).toLocaleString('en-GB', {
+    timeZone: 'Asia/Jakarta',
+    hour12: false,
+  });
+
+  const toWIBDate = (value: string | number | Date) =>
+    new Date(value).toLocaleDateString('en-GB', { timeZone: 'Asia/Jakarta' });
+    useEffect(() => {
+      loadHistory();
 
     // Subscribe to real-time updates
     const subscription = supabase
@@ -108,8 +116,8 @@ export default function History() {
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return {
-      date: date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+      date: date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' }),
+      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' })
     };
   };
 

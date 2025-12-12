@@ -8,6 +8,7 @@ type AssetRequest = {
   assetId: string
   assetName: string
   requestedAt: string
+  returnDate?: string
   reason?: string
   status: 'pending' | 'approved' | 'denied'
 }
@@ -17,6 +18,17 @@ export default function AssetRequests() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'pending' | 'all'>('pending')
+
+const toWIBDateTime = (value: string | number | Date) =>
+  new Date(value).toLocaleString('en-GB', {
+    timeZone: 'Asia/Jakarta',
+    hour12: false,
+  })
+
+const toWIBDate = (value: string | number | Date) =>
+  new Date(value).toLocaleDateString('en-GB', {
+    timeZone: 'Asia/Jakarta',
+  })
 
   useEffect(() => {
     fetchRequests()
@@ -33,6 +45,7 @@ export default function AssetRequests() {
         assetId: r.asset_id,
         assetName: r.asset_name,
         requestedAt: r.request_date,
+        returnDate: r.return_date,
         reason: r.notes,
         status: r.status,
       }))
@@ -55,7 +68,7 @@ export default function AssetRequests() {
       
       // Update asset status to "Dipinjam"
       if (assetId) {
-        await assetAPI.update(assetId, { status_aset: 'Dipinjam' })
+        await assetAPI.update(assetId, { status_aset: 'Dipinjam', peminjam: requests.find(r => r.id === requestId)?.userName || '' })
       }
       
       setRequests(prev =>
@@ -171,6 +184,9 @@ export default function AssetRequests() {
                     Requested
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#C2C3C7' }}>
+                    Return Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#C2C3C7' }}>
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: '#C2C3C7' }}>
@@ -197,7 +213,10 @@ export default function AssetRequests() {
                       {req.reason || <span style={{ color: '#5F574F' }}>-</span>}
                     </td>
                     <td className="px-6 py-4 text-sm" style={{ color: '#83769C' }}>
-                      {new Date(req.requestedAt).toLocaleString()}
+                      {toWIBDateTime(req.requestedAt)}
+                    </td>
+                    <td className="px-6 py-4 text-sm" style={{ color: '#83769C' }}>
+                      {req.returnDate ? toWIBDate(req.returnDate) : <span style={{ color: '#5F574F' }}>-</span>}
                     </td>
                     <td className="px-6 py-4">
                       <span
