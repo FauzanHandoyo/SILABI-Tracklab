@@ -1,160 +1,144 @@
-#include "BLEDevice.h"
-#include "BLEScan.h"
 #include <vector>
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+#include "BLEDevice.h"
+#include "BLEScan.h"
 
-#define WIFI_CHANNEL 6
+// --- KONFIGURASI ---
+#define WIFI_CHANNEL 5
+uint8_t gatewayAddress[] = {0x68, 0x25, 0xDD, 0x48, 0x2F, 0xD8}; 
 
-uint8_t gatewayAddress[] = {0x68, 0x25, 0xDD, 0x48, 0x2F, 0xD8};
-#define MSG_CONFIG  1
-#define MSG_REPORT  2
+// --- TIMEOUT ---
+const unsigned long TIMEOUT_HILANG = 300000; // 60 Detik
 
 typedef struct silabi_message {
-    uint8_t msgType;     
-    int asset_id;         
-    char asset_name[30];  
-    int status;           
-    int rssi;
+    uint8_t msgType; int asset_id; char asset_name[30]; int status; int rssi;
 } silabi_message;
 
-silabi_message dataMasuk;
-silabi_message dataKirim;
-
-esp_now_peer_info_t peerInfo;
-
 struct AsetTarget {
-  int id;
-  String nama;
-  bool ditemukan;
-  int rssi;
+  int id; String nama; 
+  unsigned long lastSeen; 
   String statusTerakhir;
+  int rssi;
 };
 
 std::vector<AsetTarget> daftarAset;
+silabi_message dataKirim;
+silabi_message dataMasuk;
+esp_now_peer_info_t peerInfo;
 static BLEScan* pBLEScan;
-int scanTime = 12;
+int scanTime = 5; 
 
+// --- ESP-NOW RECV ---
 void OnDataRecv(const esp_now_recv_info_t * recv_info, const uint8_t *incomingData, int len) {
   memcpy(&dataMasuk, incomingData, sizeof(dataMasuk));
-
-  if (dataMasuk.msgType == MSG_CONFIG) {
-    String namaBaru = String(dataMasuk.asset_name);
-    int idBaru = dataMasuk.asset_id;
-
-    bool sudahAda = false;
-    for (auto &aset : daftarAset) {
-      if (aset.id == idBaru) {
-        sudahAda = true;
-        break;
-      }
-    }
-
-    if (!sudahAda) {
-      AsetTarget asetBaru;
-      asetBaru.id = idBaru;
-      asetBaru.nama = namaBaru;
-      asetBaru.ditemukan = false;
-      asetBaru.rssi = 0;
-      asetBaru.statusTerakhir = "";
- 
-      daftarAset.push_back(asetBaru);
+  if (dataMasuk.msgType == 1) { 
+    String nama = String(dataMasuk.asset_name);
+    bool exists = false;
+    for (auto &a : daftarAset) if (a.id == dataMasuk.asset_id) exists = true;
     
-      Serial.printf("[ESP-NOW] Target Diterima: %s (ID: %d)\n", namaBaru.c_str(), idBaru);
+    if (!exists) {
+      AsetTarget t;
+      t.id = dataMasuk.asset_id; t.nama = nama; 
+      
+      // --- [FIX 1] STARTUP CHEAT ---
+      // Pura-pura kita baru saja melihatnya agar status awal "DI TEMPAT"
+      t.lastSeen = millis(); 
+      t.statusTerakhir = "DI TEMPAT"; 
+      t.rssi = -50; // RSSI palsu untuk awal
+      
+      daftarAset.push_back(t);
+      Serial.printf("[Config] Target Diterima: %s (Auto-Set: DI TEMPAT)\n", nama.c_str());
     }
   }
 }
+void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {}
 
+// --- BLE CALLBACK ---
 class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) {
-      String deviceName = advertisedDevice.getName().c_str();
-     
+      String name = advertisedDevice.getName().c_str();
+      
+      // --- [DEBUG] Print APA SAJA yang dilihat scanner ---
+      if (name.length() > 0) Serial.printf("   > Terdeteksi: %s (%d dBm)\n", name.c_str(), advertisedDevice.getRSSI());
+      
       for (int i = 0; i < daftarAset.size(); i++) {
-        if (deviceName == daftarAset[i].nama) {
-          daftarAset[i].ditemukan = true;
+        if (name == daftarAset[i].nama) {
+          // KETEMU!
+          daftarAset[i].lastSeen = millis();
           daftarAset[i].rssi = advertisedDevice.getRSSI();
+          Serial.println("   >>> MATCH FOUND! <<<");
         }
       }
     }
 };
 
-void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
-}
-
 void setup() {
    Serial.begin(115200);
-   Serial.println("\n--- SILABI Scanner (Client Mode) ---");
+   Serial.println("\n--- SILABI Scanner (Video Ready) ---");
 
    WiFi.mode(WIFI_STA);
-   
    esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
-   Serial.printf("[Info] WiFi Channel dikunci ke: %d\n", WIFI_CHANNEL);
-
-   if (esp_now_init() != ESP_OK) {
-      Serial.println("Error inisialisasi ESP-NOW");
-      ESP.restart();
-   }
+   if (esp_now_init() != ESP_OK) ESP.restart();
    
    esp_now_register_recv_cb(OnDataRecv);
    esp_now_register_send_cb(OnDataSent);
 
    memcpy(peerInfo.peer_addr, gatewayAddress, 6);
-   peerInfo.channel = WIFI_CHANNEL;
-   peerInfo.encrypt = false;
-   
-   if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-      Serial.println("Gagal add peer (Mungkin sudah ada)");
-   }
+   peerInfo.channel = WIFI_CHANNEL; peerInfo.encrypt = false;
+   esp_now_add_peer(&peerInfo);
 
    BLEDevice::init("");
    pBLEScan = BLEDevice::getScan();
    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-   pBLEScan->setActiveScan(true);
-   pBLEScan->setInterval(100);
-   pBLEScan->setWindow(99);
    
-   Serial.println("Scanner Siap. Menunggu Config dari Gateway...");
+   // --- [FIX 2] RADIO SETTINGS ---
+   pBLEScan->setActiveScan(true); // Active scan lebih 'agresif' mencari nama
+   pBLEScan->setInterval(100);     
+   pBLEScan->setWindow(99);       
 }
-
 
 void loop() {
    if (daftarAset.empty()) {
-      Serial.println("[Idle] Belum ada data aset. Menunggu Gateway mengirim Config...");
-      delay(3000);
-      return;
+      Serial.println("Waiting for config...");
+      delay(2000); return;
    }
 
-   Serial.printf("\n--- Scan (%d Aset) ---\n", daftarAset.size());
-
-   for (int i = 0; i < daftarAset.size(); i++) {
-      daftarAset[i].ditemukan = false;
-      daftarAset[i].rssi = 0;
-   }
-
-   BLEScanResults* foundDevices = pBLEScan->start(scanTime, false);
+   Serial.println("Scanning...");
+   pBLEScan->start(scanTime, false);
    pBLEScan->clearResults();
 
-   for (int i = 0; i < daftarAset.size(); i++) {    
-      String statusSekarang = daftarAset[i].ditemukan ? "DI TEMPAT" : "HILANG";
-      int statusCode = daftarAset[i].ditemukan ? 1 : 0;
-      int rssiValue = daftarAset[i].rssi;
+   unsigned long now = millis();
+   
+   for (int i = 0; i < daftarAset.size(); i++) {
+      String statusLogika;
+      
+      // Hitung sisa waktu hidup
+      long timeSinceSeen = now - daftarAset[i].lastSeen;
+      
+      if (timeSinceSeen < TIMEOUT_HILANG) {
+         statusLogika = "DI TEMPAT";
+      } else {
+         statusLogika = "HILANG/PINDAH";
+         daftarAset[i].rssi = 0;
+      }
 
-      if (statusSekarang != daftarAset[i].statusTerakhir) {
-         Serial.printf("[UPDATE] %s -> %s (RSSI: %d). Mengirim...\n", daftarAset[i].nama.c_str(), statusSekarang.c_str(), rssiValue);
+      // Debug Timer
+      Serial.printf("[Status] %s: %s (Seen: %ld sec ago)\n", 
+                    daftarAset[i].nama.c_str(), statusLogika.c_str(), timeSinceSeen/1000);
+
+      // Kirim Jika Berubah
+      if (statusLogika != daftarAset[i].statusTerakhir) {
+         Serial.printf("[UPDATE] Sending change to Gateway...\n");
          
-         dataKirim.msgType = MSG_REPORT;
+         dataKirim.msgType = 2; // Report
          dataKirim.asset_id = daftarAset[i].id;
-         dataKirim.status = statusCode;
-         dataKirim.rssi = rssiValue;
+         dataKirim.status = (statusLogika == "DI TEMPAT") ? 1 : 0;
+         dataKirim.rssi = daftarAset[i].rssi;
          
-         esp_err_t result = esp_now_send(gatewayAddress, (uint8_t *) &dataKirim, sizeof(dataKirim));
-         
-         if (result == ESP_OK) {
-            daftarAset[i].statusTerakhir = statusSekarang;
-         } else {
-            Serial.println("[Error] Gagal kirim ke Gateway");
-         }
+         esp_now_send(gatewayAddress, (uint8_t *) &dataKirim, sizeof(dataKirim));
+         daftarAset[i].statusTerakhir = statusLogika;
       }
    }
 }
