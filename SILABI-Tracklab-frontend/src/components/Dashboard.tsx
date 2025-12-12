@@ -48,7 +48,7 @@ const Dashboard: React.FC = () => {
         id: `LAB-${String(asset.id).padStart(3, '0')}`,
         name: asset.nama_aset,
         category: asset.category || 'Unknown',
-        status: asset.status_hilang 
+        status: asset.status_hilang || asset.status_aset === 'Hilang'
           ? 'Missing' 
           : asset.status_aset === 'Tersedia' 
           ? 'Available' 

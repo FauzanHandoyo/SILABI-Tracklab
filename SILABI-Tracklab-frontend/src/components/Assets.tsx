@@ -145,7 +145,7 @@ export default function Assets() {
                     console.log('Transforming asset:', asset);
                     let status: 'Present' | 'Missing' | 'Inactive' | 'Borrowed' = 'Inactive'
                     
-                    if (asset.status_hilang) {
+                    if (asset.status_hilang || asset.status_aset === 'Hilang') {
                         status = 'Missing'
                     } else if (asset.status_aset === 'Tersedia') {
                         status = 'Present'
@@ -241,7 +241,7 @@ export default function Assets() {
     const handleCreated = (created: any) => {
         let status: 'Present' | 'Missing' | 'Inactive' | 'Borrowed' = 'Inactive'
         
-        if (created.status_hilang) {
+        if (created.status_hilang || created.status_aset === 'Hilang') {
             status = 'Missing'
         } else if (created.status_aset === 'Tersedia') {
             status = 'Present'
@@ -294,7 +294,7 @@ export default function Assets() {
     const handleUpdate = (updatedRow: any) => {
         let status: 'Present' | 'Missing' | 'Inactive' | 'Borrowed' = 'Inactive'
         
-        if (updatedRow.status_hilang) {
+        if (updatedRow.status_hilang || updatedRow.status_aset === 'Hilang') {
             status = 'Missing'
         } else if (updatedRow.status_aset === 'Tersedia') {
             status = 'Present'

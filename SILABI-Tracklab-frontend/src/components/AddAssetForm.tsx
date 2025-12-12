@@ -71,6 +71,7 @@ export default function AddAssetForm({ onCreated, onCancel }: Props) {
             value={form.nama_aset} 
             onChange={handleChange} 
             placeholder="Enter asset name" 
+            maxLength={15}
             className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
             style={{ 
               backgroundColor: '#000000',
