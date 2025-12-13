@@ -60,15 +60,6 @@ export default function Assets() {
     })
     const returnDateInputRef = useRef<HTMLInputElement | null>(null)
 
-    const toWIBDateTime = (value: string | number | Date) =>
-    new Date(value).toLocaleString('en-GB', {
-        timeZone: 'Asia/Jakarta',
-        hour12: false,
-    });
-
-    const toWIBDate = (value: string | number | Date) =>
-    new Date(value).toLocaleDateString('en-GB', { timeZone: 'Asia/Jakarta' });
-
     useEffect(() => {
         let cancelled = false
 
@@ -310,7 +301,7 @@ export default function Assets() {
             name: updatedRow.nama_aset,
             assetType: updatedRow.category || 'Unknown',
             location: updatedRow.location || 'Unknown',
-            lastSeen: updatedRow.last_updated || new Date().toISOString(),
+            lastSeen: updatedRow.last_updated || new Date(),
             rssi: updatedRow.latitude && updatedRow.longitude ? -60 : 0,
             status: status,
             borrowedBy: updatedRow.peminjam || updatedRow.assigned_to || ''
@@ -417,7 +408,6 @@ export default function Assets() {
             }
 
             handleCloseBorrowModal()
-            alert('Asset borrow request submitted successfully!')
         } catch (err) {
             console.error('Failed to submit request:', err)
             setRequestModal(prev => ({ ...prev, error: 'Failed to submit borrow request' }))
@@ -782,7 +772,7 @@ export default function Assets() {
                             )}
                             
                                         {/* Last seen - shown for all statuses */}
-                                        <div><span style={{ color: '#83769C' }}>Last seen:</span> {toWIBDateTime(asset.lastSeen)}</div>
+                                        <div><span style={{ color: '#83769C' }}>Last seen:</span> {new Date(asset.lastSeen + (asset.lastSeen.endsWith('Z') ? '' : 'Z')).toLocaleString('en-US', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
                             
                             {/* Status-specific information */}
                             {asset.status === 'Missing' && (

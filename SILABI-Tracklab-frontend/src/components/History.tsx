@@ -22,46 +22,8 @@ export default function History() {
   const [search, setSearch] = useState('');
   const [timeFilter, setTimeFilter] = useState('7');
 
-  const toWIBDateTime = (value: string | number | Date) =>
-  new Date(value).toLocaleString('en-GB', {
-    timeZone: 'Asia/Jakarta',
-    hour12: false,
-  });
-
-  const toWIBDate = (value: string | number | Date) =>
-    new Date(value).toLocaleDateString('en-GB', { timeZone: 'Asia/Jakarta' });
-    useEffect(() => {
-      loadHistory();
-
-    // Subscribe to real-time updates
-    const subscription = supabase
-      .channel('asset_history_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'asset_history'
-        },
-        (payload) => {
-          console.log('Real-time update received:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            loadHistory();
-          } else if (payload.eventType === 'UPDATE') {
-            loadHistory();
-          } else if (payload.eventType === 'DELETE') {
-            setHistory(prev => prev.filter(h => h.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+  useEffect(() => {
+    loadHistory();
   }, [timeFilter]);
 
   const loadHistory = async () => {
@@ -98,6 +60,7 @@ export default function History() {
       'Present': { bg: '#00E436', text: '#000000' },
       'Dipinjam': { bg: '#FFA300', text: '#000000' },
       'Missing': { bg: '#FF004D', text: '#FFF1E8' },
+      'Hilang': { bg: '#FF004D', text: '#FFF1E8' },
       'Dalam Perbaikan': { bg: '#FFEC27', text: '#000000' }
     };
 
@@ -115,9 +78,19 @@ export default function History() {
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
+    const wibTime = date.toLocaleString('en-GB', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false // Use 24-hour format
+    });
     return {
-      date: date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' }),
-      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' })
+      date: wibTime.split(',')[0],
+      time: wibTime.split(',')[1].trim()
     };
   };
 

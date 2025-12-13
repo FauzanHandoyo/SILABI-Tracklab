@@ -19,17 +19,6 @@ export default function AssetRequests() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'pending' | 'all'>('pending')
 
-const toWIBDateTime = (value: string | number | Date) =>
-  new Date(value).toLocaleString('en-GB', {
-    timeZone: 'Asia/Jakarta',
-    hour12: false,
-  })
-
-const toWIBDate = (value: string | number | Date) =>
-  new Date(value).toLocaleDateString('en-GB', {
-    timeZone: 'Asia/Jakarta',
-  })
-
   useEffect(() => {
     fetchRequests()
   }, [])
@@ -60,8 +49,6 @@ const toWIBDate = (value: string | number | Date) =>
   }
 
   const handleApprove = async (requestId: string) => {
-    if (!confirm('Approve this asset request?')) return
-
     try {
       const response = await requestAPI.approveRequest(requestId)
       const assetId = response.data?.asset_id
@@ -82,8 +69,6 @@ const toWIBDate = (value: string | number | Date) =>
   }
 
   const handleDeny = async (requestId: string) => {
-    if (!confirm('Deny this asset request?')) return
-
     try {
       await requestAPI.denyRequest(requestId)
       setRequests(prev =>
@@ -213,10 +198,10 @@ const toWIBDate = (value: string | number | Date) =>
                       {req.reason || <span style={{ color: '#5F574F' }}>-</span>}
                     </td>
                     <td className="px-6 py-4 text-sm" style={{ color: '#83769C' }}>
-                      {toWIBDateTime(req.requestedAt)}
+                      {new Date(req.requestedAt + (req.requestedAt.endsWith('Z') ? '' : 'Z')).toLocaleDateString('en-US', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' })}
                     </td>
                     <td className="px-6 py-4 text-sm" style={{ color: '#83769C' }}>
-                      {req.returnDate ? toWIBDate(req.returnDate) : <span style={{ color: '#5F574F' }}>-</span>}
+                      {req.returnDate ? new Date(req.returnDate + (req.returnDate.endsWith('Z') ? '' : 'Z')).toLocaleDateString('en-US', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }) : <span style={{ color: '#5F574F' }}>-</span>}
                     </td>
                     <td className="px-6 py-4">
                       <span

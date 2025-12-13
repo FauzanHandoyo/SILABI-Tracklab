@@ -8,6 +8,7 @@ const pool = new Pool({
   keepAlive: true,
   idleTimeoutMillis: 60 * 1000,        // close idle clients sooner
   connectionTimeoutMillis: 20 * 1000,  // fail fast on connect
+  options: '-c timezone=Asia/Jakarta'
 });
 
 pool.on('error', (err) => {

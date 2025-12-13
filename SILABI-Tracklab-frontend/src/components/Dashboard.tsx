@@ -194,7 +194,7 @@ const Dashboard: React.FC = () => {
                       {statusBadge[asset.status]}
                     </span>
                   </td>
-                  <td className="py-2 px-3" style={{ color: '#83769C' }}>{asset.lastUpdated}</td>
+                  <td className="py-2 px-3" style={{ color: '#83769C' }}>{new Date(asset.lastUpdated + (asset.lastUpdated.endsWith('Z') ? '' : 'Z')).toLocaleDateString('en-US', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' })}</td>
                 </tr>
               ))}
               {assets.filter(tabs[activeTab].filter).length === 0 && (
