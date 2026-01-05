@@ -1,5 +1,3 @@
-Berikut adalah versi `README.md` yang telah diperbarui dan diperlengkap berdasarkan dokumen laporan proyek, manual pengguna, dan presentasi yang Anda unggah. Dokumen ini mencakup detail teknis yang lebih spesifik, daftar fitur yang akurat, serta kredit pengembang.
-
 # SILABI Tracklab (Sistem Pelacakan Aset Laboratorium Terpadu Berbasis IoT)
 
 SILABI Tracklab adalah sistem otomatisasi manajemen aset yang dirancang untuk memodernisasi laboratorium universitas. Sistem ini menggantikan pencatatan manual dengan jaringan sensor terdistribusi yang memungkinkan pelacakan real-time, deteksi kehilangan otomatis, dan manajemen peminjaman alat.
